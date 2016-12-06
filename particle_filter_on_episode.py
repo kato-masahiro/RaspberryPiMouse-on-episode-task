@@ -4,14 +4,15 @@
 パーティクルフィルタでエピソード的タスクを学習させる
 
 while(報酬==0):
+    すべてのパーティクルの位置を時刻tに対して+1ずらす
     センサ値をN回取得して平均を取る
     latest_sen = 平均
     パーティクルの投票で行動を決定する
     while(行動終了の条件を満たさない):
         一瞬だけ行動する
         N回センサ値を取得して平均を取る
-    パーティクルを尤度関数を用いて再配置する
     報酬を得る
+    パーティクルを尤度関数を用いて再配置する
     latest_sen,行動、報酬をエピソード集合に追加
 """
 import rospy
@@ -85,19 +86,37 @@ def sensors_ave():
 #        for i in len(episode_set):#過去に経験したエピソードの尤度を求める
 #            if #a = b or not a == b で分岐するが。。。
 #            likelihood[i] = 
-#
             
 ############################################
 #   投票アルゴリズムで行動を決定する関数   #
 ############################################
 def voting(particle):
+    vote = range(1000) #各パーティクルが自分の所属しているエピソードに対して持つ評価
+    for i in range(vote):
+        vote[i] = 0
+
     if T == 1: #まだどんなエピソードも経験していないのでランダムに行動させる
         return random.choice("frl")
     else:#各パーティクルが投票で決める
+        for i in range(1000):
+            distance = 0 #パーティクルがいるエピソードとその直後の非ゼロ報酬が得られたエピソードとの距離
+            non_zero_reword = 0
+            for l in range(len(episode_set) - particle[i][0] - 1):
+                distance += 1 
+                if episode_set[ particle[i][0] + distance ][5] != 0:
+                    non_zero_reword = episode_set[particle[i][0] + distance][5]
+                    break
+            if non_zero_reword != 0:
+                vote[i] = non_zero_reword / distance
+            else vote[i] = 0
 
-        
-        
-        
+#######################################
+#  パーティクルをスライドさせる関数   #
+#######################################
+def slide(particle)
+    for i in range(1000):
+        particle[i][0] += 1
+    return particle
 
 ##################################################
 #    センサ値をsubscribeするコールバック関数     #
@@ -117,6 +136,7 @@ def sensors_callback(message):
     lf = message.left_forward
     sensors_ave() #N回分のセンサ値の平均を取る
     if got_average_flag == True and moving_flag == False:
+        particle = slide():
         for i in range(4):
             latest_sen[i] = sensors_val[i]
             sensors_val[i] = 0
