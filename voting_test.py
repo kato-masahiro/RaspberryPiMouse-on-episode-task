@@ -2,10 +2,10 @@
 # 関数voting のテスト
 
 episode_set =[
-[0,0,0,0,"r",0],
-[0,0,0,0,"f",-1],
-[0,0,0,0,"r",1],
 [0,0,0,0,"f",0],
+[0,0,0,0,"f",0],
+[0,0,0,0,"r",1],
+[0,0,0,0,"r",-1],
 ]
 particle = range(100)
 for i in (particle):
@@ -37,7 +37,16 @@ def voting(particle):
             else:
                 vote[i] = 0.0
             print "vote:",vote[i]
-
     #voteに基づく行動決定。voteの合計がゼロやマイナスになる可能性がある点に注意
+    got = {"f":0.0,"r":0.0,"l":0.0}
+    for i in range(100):
+        if int(vote[i]) != 0:
+            print episode_set[particle[i][0]] [4]
+            got [episode_set[particle[i][0]] [4]] += vote[i]
+    print got
+    # gotの中で最大の数字を持つもののキーをひとつ返す
+    # 参考: http://cointoss.hatenablog.com/entry/2013/10/16/123129
+    return max(got.items(),key=lambda x:x[1])[0]
 
-voting(particle)
+action = voting(particle)
+print action 
