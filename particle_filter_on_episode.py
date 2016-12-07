@@ -18,6 +18,9 @@ while(報酬==0):
 import rospy
 import os
 import random
+
+import voting
+
 from raspimouse_ros.msg import LightSensorValues
 from gazebo_msgs.msg import ModelStates
 from geometry_msgs.msg import Twist
@@ -87,33 +90,11 @@ def sensors_ave():
 #            if #a = b or not a == b で分岐するが。。。
 #            likelihood[i] = 
             
-############################################
-#   投票アルゴリズムで行動を決定する関数   #
-############################################
-def voting(particle):
-    vote = range(1000) #各パーティクルが自分の所属しているエピソードに対して持つ評価
-    for i in range(vote):
-        vote[i] = 0
-
-    if T == 1: #まだどんなエピソードも経験していないのでランダムに行動させる
-        return random.choice("frl")
-    else:#各パーティクルが投票で決める
-        for i in range(1000):
-            distance = 0 #パーティクルがいるエピソードとその直後の非ゼロ報酬が得られたエピソードとの距離
-            non_zero_reword = 0
-            for l in range(len(episode_set) - particle[i][0] - 1):
-                distance += 1 
-                if episode_set[ particle[i][0] + distance ][5] != 0:
-                    non_zero_reword = episode_set[particle[i][0] + distance][5]
-                    break
-            if non_zero_reword != 0:
-                vote[i] = non_zero_reword / distance
-            else vote[i] = 0
 
 #######################################
 #  パーティクルをスライドさせる関数   #
 #######################################
-def slide(particle)
+def slide(particle):
     for i in range(1000):
         particle[i][0] += 1
     return particle
@@ -136,12 +117,12 @@ def sensors_callback(message):
     lf = message.left_forward
     sensors_ave() #N回分のセンサ値の平均を取る
     if got_average_flag == True and moving_flag == False:
-        particle = slide():
+        particle = slide()
         for i in range(4):
             latest_sen[i] = sensors_val[i]
             sensors_val[i] = 0
             latest_episode[i] = latest_sen[i] #最新のepisode_setにlatest_senを追加
-        action = voting(particle) #投票で行動を決定する
+        action = voting.voting(particle) #投票で行動を決定する
         print latest_sen,"--->",sum(latest_sen)
 
 #########################################################
