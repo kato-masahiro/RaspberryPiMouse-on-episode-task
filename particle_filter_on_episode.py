@@ -6,13 +6,15 @@
 while(報酬==0):
     センサ値をN回取得して平均を取る
     latest_sen = 平均
+    latest_episodeにlatest_senを追加
     パーティクルを尤度関数を用いて再配置する(報酬は前回得たものを用いる)
     パーティクルの投票で行動を決定する
     while(行動終了の条件を満たさない):
         一瞬だけ行動する
         N回センサ値を取得して平均を取る
     報酬を得る
-    latest_sen,行動、報酬をエピソード集合に追加
+    行動、報酬をlatest_episodeに追加
+    latest_episodeをepisode_setに追加した後空にする
 """
 import rospy
 import os
@@ -68,7 +70,7 @@ if os.path.exists("./episode_set.txt"):
 print episode_set
 
 ########################################
-#      センサ値の平均を取る関数        #
+
 ########################################
 def sensors_ave():
     global rf;global rs;global ls;global lf
