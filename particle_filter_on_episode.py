@@ -17,6 +17,7 @@ while(報酬==0):
 import rospy
 import os
 import random
+import math
 
 import voting
 
@@ -43,8 +44,9 @@ turn_threshold = 1000 #旋回をやめるかどうかの判定に使われる閾
 particle = range(1000) #パーティクルの位置、重みが入るリスト。パーティクルの重みの合計は1
 for i in particle:
     particle[i] = [0, 0.001]
-latest_episode = [ 0, 0, 0, 0,"",0] #最新のエピソード。センサ値、行動、報酬。
-episode_set = [[" "]] #過去のエピソードの集合。センサ値、行動、報酬
+latest_episode = [0 ,0, 0, 0, 0,""] #最新のエピソード。報酬値、センサ値、行動。
+episode_set = [[]] #過去のエピソードの集合。報酬値、センサ値、行動
+likelihood = [0.0] #過去のエピソード集合に対する尤度
 
 ###########################################################
 #    particle,episode_setについてファイルから読み込む     #
@@ -79,24 +81,29 @@ def sensors_ave():
     else:
         got_average_flag = False
 
-######################################################
-#   尤度関数でパーティクルをリサンプリングする関数   #
-######################################################
-#def resampling():
-#    if T > 1:
-#        likelihood = range(episode_set)
-#        for i in len(episode_set):#過去に経験したエピソードの尤度を求める
-#            if #a = b or not a == b で分岐するが。。。
-#            likelihood[i] = 
-            
+##################################################
+#       過去のエピソードの尤度を求める関数       #
+##################################################
+def sensor_update():
+    if T != 0:
+        likelihood = range(episode_set) 
+        for i in len(episode_set):
+            if episode_set[i][0] == latest_episode[0]: #過去のエピソードが現在のものと等しい
+                l1 = math.fabs(latest_episode[1] - episode_set[i][1])
+                l2 = math.fabs(latest_episode[2] - episode_set[i][2])
+                l3 = math.fabs(latest_episode[3] - episode_set[i][3])
+                l3 = math.fabs(latest_episode[4] - episode_set[i][4])
+                likelihood[i] = 0.5 ** (l1+l2+l3+l4)
+            else:
+                likelihood[i] = 0.0
+    else:
+        likelihood = [0.0]
 
-#######################################
-#  パーティクルをスライドさせる関数   #
-#######################################
-def slide(particle):
-    for i in range(1000):
-        particle[i][0] += 1
-    return particle
+    return likelihood
+
+########################################################
+#   尤度に基づきパーティクルをリサンプリングする関数   #
+########################################################
 
 ##################################################
 #    センサ値をsubscribeするコールバック関数     #
@@ -120,7 +127,8 @@ def sensors_callback(message):
         for i in range(4):
             latest_sen[i] = sensors_val[i]
             sensors_val[i] = 0
-            latest_episode[i] = latest_sen[i] #最新のepisode_setにlatest_senを追加
+            latest_episode[i + 1] = latest_sen[i] #最新のepisode_setにlatest_senを追加
+        likelihood = sensor_update() #sensor_updateによって過去のエピソード集合の尤度を求める
         action = voting.voting(particle) #投票で行動を決定する
         print latest_sen,"--->",sum(latest_sen)
 
