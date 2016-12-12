@@ -19,8 +19,6 @@ import os
 import random
 import math
 
-import voting
-
 from raspimouse_ros.msg import LightSensorValues
 from gazebo_msgs.msg import ModelStates
 from geometry_msgs.msg import Twist
@@ -44,9 +42,10 @@ turn_threshold = 1000 #旋回をやめるかどうかの判定に使われる閾
 particle = range(1000) #パーティクルの位置、重みが入るリスト。パーティクルの重みの合計は1
 for i in particle:
     particle[i] = [0, 0.001]
-latest_episode = [0 ,0, 0, 0, 0,""] #最新のエピソード。報酬値、センサ値、行動。
+latest_episode = [0.0 ,0, 0, 0, 0,""] #最新のエピソード。報酬値、センサ値、行動。
 episode_set = [[]] #過去のエピソードの集合。報酬値、センサ値、行動
-likelihood = [0.0] #過去のエピソード集合に対する尤度
+
+alpha = 0.0
 
 ###########################################################
 #    particle,episode_setについてファイルから読み込む     #
@@ -55,11 +54,16 @@ if os.path.exists("./particle.txt"):
     f = open("particle.txt","r")
     particle = f.read()
     f.close()
+    print "ファイル:particle.txtを読み込みました"
+
 if os.path.exists("./episode_set.txt"):
     f = open("episode_set.txt","r")
     episode_set = f.read()
     f.close
     T = len(episode_set) + 1
+    print "ファイル:episode_set.txtを読み込みました"
+    print "---episode_set---"
+    print episode_set
 
 print episode_set
 
@@ -81,29 +85,69 @@ def sensors_ave():
     else:
         got_average_flag = False
 
-##################################################
-#       過去のエピソードの尤度を求める関数       #
-##################################################
+#############################################################
+#     パーティクルの尤度を求める関数                        #
+#  !! この関数の実行後、particle[][1]の和は必ず1になる !!   #
+#############################################################
 def sensor_update():
-    if T != 0:
-        likelihood = range(episode_set) 
-        for i in len(episode_set):
-            if episode_set[i][0] == latest_episode[0]: #過去のエピソードが現在のものと等しい
-                l1 = math.fabs(latest_episode[1] - episode_set[i][1])
-                l2 = math.fabs(latest_episode[2] - episode_set[i][2])
-                l3 = math.fabs(latest_episode[3] - episode_set[i][3])
-                l3 = math.fabs(latest_episode[4] - episode_set[i][4])
-                likelihood[i] = 0.5 ** (l1+l2+l3+l4)
+    global alpha
+    alpha = 0.0
+    if T != 1:
+        for i in 1000:
+            if episode_set[ particle[i][0] ][0] == latest_episode[0]: #過去のエピソードで得られた報酬が現在のものと等しい
+                l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
+                l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
+                l3 = math.fabs(latest_episode[3] - episode_set[ particle[i][0] ][3])
+                l4 = math.fabs(latest_episode[4] - episode_set[ particle[i][0] ][4])
+                particle[i][1] = 0.5 ** (l1+l2+l3+l4)
             else:
-                likelihood[i] = 0.0
-    else:
-        likelihood = [0.0]
+                particle[i][1] = 0.0
+    elif T == 1:
+        for i in 1000:
+            particle[i][1] = [0.0]
 
-    return likelihood
+    #alphaも求める
+    for i in range(1000):
+        alpha += particle[i][1]
+
+    #alphaで正規化
+    if alpha > 0.0:
+        for i in range(1000):
+            particle[i][1] /= alpha
+    else:
+        for i in range(1000):
+            particle[i][1] = 0.001
 
 ########################################################
 #   尤度に基づきパーティクルをリサンプリングする関数   #
+#  パーティクルがいないエピソードができないように注意  #
 ########################################################
+def motion_update(particle):
+    if T != 1: #重みに基づいてリサンプリング
+        likelihood = range(len(episode_set))
+        for i in range(len(likelihood)):#パーティクルの尤度からエピソードの尤度(likelihood)を求める
+            likelihood[i] = 0.0
+            for ii in range (1000):
+                if particle[ii][0] == i:
+                    likelihood[i] += particle[ii][1]
+        #likelihoodの分布に基づき900個のパーティクルを配置する
+        for i in range(900):
+            seed = random.randint(1,1000)
+            for ii in range(len(likelihood)):
+                seed -= likelihood[ii]
+                if seed <= 0:
+                    particle[i][0] = ii
+                    break
+        #likelihoodとは無関係に100個のパーティクルを配置する
+        for i in range(900,1000):            
+           seed = random.randint(0,len(episode_set)-1)
+           particle[i][0] = seed
+
+    elif T == 0: 
+        for i in range(1000):
+            particle[i][0] = 0
+
+    return particle
 
 ##################################################
 #    センサ値をsubscribeするコールバック関数     #
@@ -123,14 +167,15 @@ def sensors_callback(message):
     lf = message.left_forward
     sensors_ave() #N回分のセンサ値の平均を取る
     if got_average_flag == True and moving_flag == False:
-        particle = slide()
         for i in range(4):
             latest_sen[i] = sensors_val[i]
             sensors_val[i] = 0
             latest_episode[i + 1] = latest_sen[i] #最新のepisode_setにlatest_senを追加
-        likelihood = sensor_update() #sensor_updateによって過去のエピソード集合の尤度を求める
-        action = voting.voting(particle) #投票で行動を決定する
+        sensor_update() #sensor_updateによってパーティクル集合の尤度を求める
+        motion_update(particle)
+        print T
         print latest_sen,"--->",sum(latest_sen)
+        print likelihood
 
 #########################################################
 #   ロボットの現在位置をsubscribeするコールバック関数   #
