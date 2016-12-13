@@ -92,22 +92,30 @@ def sensors_ave():
 ###############################################
 #   ロボットの位置で終了するかどうかチェック  #
 ###############################################
-def end_check(x,y):
+def reword_check(x,y):
     if reword_arm == "right":
         if(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.01:
             print "ロボットは正解に到達"
+            latest_episode[0] = 1.0
             end_flag = True
         elif(x - 0.36) ** 2 + (y - 0.15) ** 2 <= 0.01:
             print "ロボットは不正解に到達"
+            latest_episode[0] = -1.0
             end_flag = True
+        else:
+            latest_episode[0] = 0.0
 
     elif reword_arm == "left":
         if(x - 0.36) ** 2 + (y - 0.15) ** 2 <= 0.01:
             print "ロボットは正解に到達"
+            latest_episode[0] = 1.0
             end_flag = True
         elif(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.01:
             print "ロボットは不正解に到達"
+            laetst_episode[0] = -1.0
             end_flag = True
+        else:
+            latest_episode[0] - 0.0
 #############################################################
 #     パーティクルの尤度を求める関数                        #
 #  !! この関数の実行後、particle[][1]の和は必ず1になる !!   #
@@ -174,6 +182,7 @@ def motion_update(particle):
 
 ######################################
 #   投票によって行動を決定する関数   #
+#!!終了時の行動stayを追加した。この行動が評価されることが無いようにチェックする必要がある
 ######################################
 def decision_making(particle):
     vote = range(1000):#各パーティクルが自分の所属しているエピソードに対して持つ評価
@@ -236,8 +245,6 @@ def sensors_callback(message):
     global counter
     global latest_sen
 
-    end_check(x,y)
-
     counter += 1
 
     #センサデータを読み込む
@@ -251,6 +258,13 @@ def sensors_callback(message):
             latest_sen[i] = sensors_val[i]
             sensors_val[i] = 0
             latest_episode[i + 1] = latest_sen[i] #最新のepisode_setにlatest_senを追加
+        reword_check(x,y)
+        if end_flag == True:
+            #センサ値、行動(stay)を書き込んで色々保存して終了
+            latest_episode[5] = "s"
+            episode_set.append(latest_episode)
+            #episode_set,particle をファイルに書き込んで終了
+            exit()
         sensor_update() #パーティクル集合の尤度を求める
         motion_update(particle) #尤度に基づきパーティクルの分布を更新する
         action = decision_making(particle) #パーティクルの投票に基づき行動を決定する
