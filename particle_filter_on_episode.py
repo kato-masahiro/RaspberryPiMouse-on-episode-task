@@ -19,6 +19,7 @@ import rospy
 import os
 import random
 import math
+import sys
 
 from raspimouse_ros.msg import LightSensorValues
 from gazebo_msgs.msg import ModelStates
@@ -96,6 +97,7 @@ def reward_check(x,y):
     global end_flag
     global latest_episode
     if reward_arm == "right":
+        print "###_reward_check_:正解との距離:",(x-0.36) ** 2 + (y + 0.15) ** 2
         if(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.01:
             print "###_reward_check_:ロボットは正解に到達"
             latest_episode[0] = 1.0
@@ -246,7 +248,7 @@ def stop(action):
             print "### _sotep_:動き続けます"
             moving_flag = True
     else:
-        if (sensors_val[0] + sensors_val[3]) >= turn_threshold:
+        if (sensors_val[0] + sensors_val[3]) <= turn_threshold:
             print "### _stop_:行動r or l は閾値によって中断された"
             moving_flag = False
         else:
@@ -287,16 +289,17 @@ def sensors_callback(message):
         reward_check(x,y)
         if end_flag == True:
             #センサ値、行動(stay)を書き込んで色々保存して終了
+            print "###終了します"
             latest_episode[5] = "s"
             episode_set.append(latest_episode)
             #episode_set,particle をファイルに書き込んで終了
             f = open("episode_set.txt","a")
-            f.write(episode_set)
+            f.write(str(episode_set))
             f.close()
             f = open("particle.txt","a")
-            f.write(particle)
+            f.write(str(particle))
             f.close()
-            exit()
+            sys.exit()
         sensor_update() #パーティクル集合の尤度を求める
         motion_update(particle) #尤度に基づきパーティクルの分布を更新する
         action = decision_making(particle) #パーティクルの投票に基づき行動を決定する
