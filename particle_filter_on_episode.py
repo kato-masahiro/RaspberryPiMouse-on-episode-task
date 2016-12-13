@@ -40,12 +40,12 @@ moving_flag = False                   # ロボットが行動中かどうかの�
 got_average_flag = False              # センサ値が平均値をとっているかどうかのフラグ
 end_flag = False                      # 非ゼロ報酬を得たらこのフラグが立って、すべての処理を終わらせる。
 fw_threshold = 3000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
-turn_threshold = 1000                 # 旋回をやめるかどうかの判定に使われる閾値(rf+lf)
+turn_threshold = 2000                 # 旋回をやめるかどうかの判定に使われる閾値(rf+lf)
 particle = range(1000)                # パーティクルの位置、重みが入るリスト。パーティクルの重みの合計は1
 for i in particle:
     particle[i] = [0, 0.001]
 latest_episode = [0.0 ,0, 0, 0, 0,""] # 最新のエピソード。報酬値、センサ値、行動。
-episode_set = [[]]                    # 過去のエピソードの集合。報酬値、センサ値、行動
+episode_set = []                    # 過去のエピソードの集合。報酬値、センサ値、行動
 alpha = 0.0
 
 epsiron = 10 #ランダムに行動する確率(グリーディではなく)
@@ -132,6 +132,7 @@ def sensor_update():
     global particle
     alpha = 0.0
     if T != 1:
+        print "###_sensor_update_:episode_set",episode_set
         for i in range(1000):
             if episode_set[ particle[i][0] ][0] == latest_episode[0]: #過去のエピソードで得られた報酬が現在のものと等しい
                 l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
@@ -223,10 +224,10 @@ def decision_making(particle):
         #グリーディならgotの中で最大の数字を持つもののキーをひとつ返す
         #参考:http://cointoss.hatenablog.com/entry/2013/10/16/123129
         if (random.randint(1,100) > epsiron):
-            if max(gotitems(),key = lambda x:x[1])[0] == "s":
+            if max(got.items(),key = lambda x:x[1])[0] == "s":
                 return random.choice("frl")
             else:
-                return max(gotitems(),key = lambda x:x[1])[0]
+                return max(got.items(),key = lambda x:x[1])[0]
         else:
             print "###_decision_making_:random_choice"
             return random.choice("frl")
@@ -270,7 +271,6 @@ def sensors_callback(message):
     global action
 
     counter += 1
-    print "###_sensors_callback_:counter = ",counter
 
     # センサデータを読み込む
     rf = message.right_forward
@@ -307,11 +307,11 @@ def sensors_callback(message):
     elif got_average_flag == True and moving_flag == True:
         print "###_sensors_callback_:動かします"
         if action == "f":
-            vel.linear.x = 0.1
+            vel.linear.x = 0.2
         elif action == "r":
-            vel.angular.z = -1.0
+            vel.angular.z = -2.0
         elif action == "l":
-            vel.angular.z = 1.0
+            vel.angular.z = 2.0
         stop(action) 
 
     pub.publish(vel)
