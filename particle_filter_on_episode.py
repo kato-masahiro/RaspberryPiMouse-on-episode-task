@@ -27,7 +27,8 @@ from geometry_msgs.msg import Twist
 ####################################
 #     グローバル変数の定義         #
 ####################################
-x = 0.0 ;y = 0.0 #ロボットの座標
+reword_arm = "right" #報酬が得られる腕。right or left
+x = 0.0; y = 0.0 #ロボットの座標
 rf = 0; rs = 0; ls = 0; lf = 0 #センサ値
 sensors_val = [0,0,0,0] #平均を取るためにrf,rs,ls,lfの和を入れるための変数
 latest_sen = [0,0,0,0] #ロボットが行動決定に用いる最新のセンサ値情報
@@ -88,6 +89,25 @@ def sensors_ave():
     else:
         got_average_flag = False
 
+###############################################
+#   ロボットの位置で終了するかどうかチェック  #
+###############################################
+def end_check(x,y):
+    if reword_arm == "right":
+        if(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.01:
+            print "ロボットは正解に到達"
+            end_flag = True
+        elif(x - 0.36) ** 2 + (y - 0.15) ** 2 <= 0.01:
+            print "ロボットは不正解に到達"
+            end_flag = True
+
+    elif reword_arm == "left":
+        if(x - 0.36) ** 2 + (y - 0.15) ** 2 <= 0.01:
+            print "ロボットは正解に到達"
+            end_flag = True
+        elif(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.01:
+            print "ロボットは不正解に到達"
+            end_flag = True
 #############################################################
 #     パーティクルの尤度を求める関数                        #
 #  !! この関数の実行後、particle[][1]の和は必ず1になる !!   #
@@ -216,7 +236,7 @@ def sensors_callback(message):
     global counter
     global latest_sen
 
-    end_check()
+    end_check(x,y)
 
     counter += 1
 
