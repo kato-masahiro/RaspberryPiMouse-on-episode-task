@@ -36,7 +36,6 @@ counter = 0                           # sensors_callbackを何回実行したか
 N = 10                                # 何回分のセンサ値の平均を取って利用するか
 T = 1                                 # 最新の時間ステップ(いままで経験したエピソードの数+1)
 action = ""                           # 行動."f","r","l","s"の3種類(前進、右旋回、左旋回,待機)待機は実際には行われない
-reward = 0.0                          # 報酬
 moving_flag = False                   # ロボットが行動中かどうかのフラグ
 got_average_flag = False              # センサ値が平均値をとっているかどうかのフラグ
 end_flag = False                      # 非ゼロ報酬を得たらこのフラグが立って、すべての処理を終わらせる。
@@ -215,7 +214,7 @@ def decision_making(particle):
                 vote[i] = 0.0
 
     #voteに基づく行動決定。voteの合計がゼロやマイナスになる可能性がある点に注意
-    got = {"f":0.0,"r":0.0,"l":0.0} # 得票数が入るディクショナリ
+    got = {"f":0.0,"r":0.0,"l":0.0,"s":0.0} # 得票数が入るディクショナリ
     for i in range(1000):
         if int(vote[i]) != 0:
             got [episode_set[particle[i][0]] [5]] += vote[i]
@@ -223,7 +222,10 @@ def decision_making(particle):
         #グリーディならgotの中で最大の数字を持つもののキーをひとつ返す
         #参考:http://cointoss.hatenablog.com/entry/2013/10/16/123129
         if (random.randint(1,100) > epsiron):
-            return max(gotitems(),key = lambda x:x[1])[0]
+            if max(gotitems(),key = lambda x:x[1])[0] == "s":
+                return random.choice("frl")
+            else:
+                return max(gotitems(),key = lambda x:x[1])[0]
         else:
             print "###_decision_making_:random_choice"
             return random.choice("frl")
@@ -280,6 +282,12 @@ def sensors_callback(message):
             latest_episode[5] = "s"
             episode_set.append(latest_episode)
             #episode_set,particle をファイルに書き込んで終了
+            f = open("episode_set.txt","a")
+            f.write(episode_set)
+            f.close()
+            f = open("particle.txt","a")
+            f.write(particle)
+            f.close()
             exit()
         sensor_update() #パーティクル集合の尤度を求める
         motion_update(particle) #尤度に基づきパーティクルの分布を更新する
