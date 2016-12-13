@@ -27,29 +27,29 @@ from geometry_msgs.msg import Twist
 ####################################
 #     グローバル変数の定義         #
 ####################################
-reword_arm = "right" #報酬が得られる腕。right or left
-x = 0.0; y = 0.0 #ロボットの座標
-rf = 0; rs = 0; ls = 0; lf = 0 #センサ値
-sensors_val = [0,0,0,0] #平均を取るためにrf,rs,ls,lfの和を入れるための変数
-latest_sen = [0,0,0,0] #ロボットが行動決定に用いる最新のセンサ値情報
-counter = 0 #sensors_callbackを何回実行したか
-N = 10 #何回分のセンサ値の平均を取って利用するか
-T = 1 #最新の時間ステップ(いままで経験したエピソードの数+1)
-action = "" # 行動."f","r","l"の3種類(前進、右旋回、左旋回)
-reward = 0.0 # 報酬
-moving_flag = False #ロボットが行動中かどうかのフラグ
-got_average_flag = False #センサ値が平均値をとっているかどうかのフラグ
-end_flag = False #非ゼロ報酬を得たらこのフラグが立って、すべての処理を終わらせる。
-fw_threshold = 3000 #前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
-turn_threshold = 1000 #旋回をやめるかどうかの判定に使われる閾値(rf+lf)
-particle = range(1000) #パーティクルの位置、重みが入るリスト。パーティクルの重みの合計は1
+reward_arm = "right"                  # 報酬が得られる腕。right or left
+x = 0.0; y = 0.0                      # ロボットの座標
+rf = 0; rs = 0; ls = 0; lf = 0        # センサ値
+sensors_val = [0,0,0,0]               # 平均を取るためにrf,rs,ls,lfの和を入れるための変数
+latest_sen = [0,0,0,0]                # ロボットが行動決定に用いる最新のセンサ値情報
+counter = 0                           # sensors_callbackを何回実行したか
+N = 10                                # 何回分のセンサ値の平均を取って利用するか
+T = 1                                 # 最新の時間ステップ(いままで経験したエピソードの数+1)
+action = ""                           # 行動."f","r","l","s"の3種類(前進、右旋回、左旋回,待機)待機は実際には行われない
+reward = 0.0                          # 報酬
+moving_flag = False                   # ロボットが行動中かどうかのフラグ
+got_average_flag = False              # センサ値が平均値をとっているかどうかのフラグ
+end_flag = False                      # 非ゼロ報酬を得たらこのフラグが立って、すべての処理を終わらせる。
+fw_threshold = 3000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
+turn_threshold = 1000                 # 旋回をやめるかどうかの判定に使われる閾値(rf+lf)
+particle = range(1000)                # パーティクルの位置、重みが入るリスト。パーティクルの重みの合計は1
 for i in particle:
     particle[i] = [0, 0.001]
-latest_episode = [0.0 ,0, 0, 0, 0,""] #最新のエピソード。報酬値、センサ値、行動。
-episode_set = [[]] #過去のエピソードの集合。報酬値、センサ値、行動
-
+latest_episode = [0.0 ,0, 0, 0, 0,""] # 最新のエピソード。報酬値、センサ値、行動。
+episode_set = [[]]                    # 過去のエピソードの集合。報酬値、センサ値、行動
 alpha = 0.0
-epsiron = 90 #グリーディに行動する確率
+
+epsiron = 10 #ランダムに行動する確率(グリーディではなく)
 
 ###########################################################
 #    particle,episode_setについてファイルから読み込む     #
@@ -89,11 +89,13 @@ def sensors_ave():
     else:
         got_average_flag = False
 
-###############################################
-#   ロボットの位置で終了するかどうかチェック  #
-###############################################
-def reword_check(x,y):
-    if reword_arm == "right":
+########################################
+#     ロボットの位置で報酬値を決定     #
+########################################
+def reward_check(x,y):
+    global end_flag
+    global latest_episode
+    if reward_arm == "right":
         if(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.01:
             print "ロボットは正解に到達"
             latest_episode[0] = 1.0
@@ -103,9 +105,11 @@ def reword_check(x,y):
             latest_episode[0] = -1.0
             end_flag = True
         else:
+            print "ロボットは行動を続行"
             latest_episode[0] = 0.0
+            end_flag = False
 
-    elif reword_arm == "left":
+    elif reward_arm == "left":
         if(x - 0.36) ** 2 + (y - 0.15) ** 2 <= 0.01:
             print "ロボットは正解に到達"
             latest_episode[0] = 1.0
@@ -115,13 +119,17 @@ def reword_check(x,y):
             laetst_episode[0] = -1.0
             end_flag = True
         else:
+            print "ロボットは行動を続行"
             latest_episode[0] - 0.0
+            end_flag = False
+
 #############################################################
 #     パーティクルの尤度を求める関数                        #
 #  !! この関数の実行後、particle[][1]の和は必ず1になる !!   #
 #############################################################
 def sensor_update():
     global alpha
+    global particle
     alpha = 0.0
     if T != 1:
         for i in 1000:
@@ -135,7 +143,7 @@ def sensor_update():
                 particle[i][1] = 0.0
     elif T == 1:
         for i in 1000:
-            particle[i][1] = [0.0]
+            particle[i][1] = [0.001]
 
     #alphaも求める
     for i in range(1000):
@@ -193,15 +201,15 @@ def decision_making(particle):
     else:#各パーティクルが投票で決める
         for i in range (1000):
             distance = 0 #パーティクルがいるエピソードとその直後の非ゼロ報酬が得られたエピソードとの距離
-            non_zero_reword = 0.0
+            non_zero_reward = 0.0
             for l in range(len(episode_set) - particle[i][0] - 1):
                 distance += 1
                 if episode_set[ particle[i][0] + distance ][0] != 0:
-                    non_zero_reword = float(episode_set[particle[i][0] + distance][0])
+                    non_zero_reward = float(episode_set[particle[i][0] + distance][0])
                     break
-            print "particle:",i," position:",particle[i][0]," distance:",distance," non_zero_reword:",non_zero_reword
-            if non_zero_reword != 0:
-                vote[i] = non_zero_reword / distance
+            print "particle:",i," position:",particle[i][0]," distance:",distance," non_zero_reward:",non_zero_reward
+            if non_zero_reward != 0:
+                vote[i] = non_zero_reward / distance
             else:
                 vote[i] = 0.0
             print "vote:",vote[i]
@@ -225,15 +233,23 @@ def decision_making(particle):
 #  センサ値が閾値を超えたらmoving_flagをFalseにする  #
 ######################################################
 def stop(action):
+    global moving_flag
     if action == "f":
         if sum(latest_sen) >= fw_threshold:
+            print "### _stop_:行動fは閾値によって中断された"
             moving_flag = False
+        else:
+            moving_flag = True
     else:
         if latest_sen[0] + latest_sen[3] >= turn_threshold
+            print "### _stop_:行動r or l は閾値によって中断された"
             moving_flag = False
+        else:
+            moving_flag = True
 
 ##################################################
 #    センサ値をsubscribeするコールバック関数     #
+#   main
 ##################################################
 def sensors_callback(message):
     vel = Twist()
@@ -244,21 +260,22 @@ def sensors_callback(message):
     global sensors_val
     global counter
     global latest_sen
+    global T
 
     counter += 1
 
-    #センサデータを読み込む
+    # センサデータを読み込む
     rf = message.right_forward
     rs = message.right_side
     ls = message.left_side
     lf = message.left_forward
-    sensors_ave() #N回分のセンサ値の平均を取る
+    sensors_ave() # N回分のセンサ値の平均を取る
     if got_average_flag == True and moving_flag == False:
         for i in range(4):
             latest_sen[i] = sensors_val[i]
             sensors_val[i] = 0
-            latest_episode[i + 1] = latest_sen[i] #最新のepisode_setにlatest_senを追加
-        reword_check(x,y)
+            latest_episode[i + 1] = latest_sen[i] # 最新のepisode_setにlatest_senを追加
+        reward_check(x,y)
         if end_flag == True:
             #センサ値、行動(stay)を書き込んで色々保存して終了
             latest_episode[5] = "s"
@@ -270,6 +287,7 @@ def sensors_callback(message):
         action = decision_making(particle) #パーティクルの投票に基づき行動を決定する
         latest_episode[5] = action #最新のepisode_setにactionを追加
         episode_set.append(latest_episode)#一連のエピソードをエピソード集合に追加
+        T += 1
         moving_flag = True
     elif got_average_flag == True and moving_flag == True:
         if action == "f":
@@ -292,7 +310,6 @@ def position_callback(message):
 
 rospy.init_node("particle_filter_on_episode")
 pub = rospy.Publisher("/raspimouse/diff_drive_controller/cmd_vel",Twist,queue_size = 10)
-
 sub1 = rospy.Subscriber("/raspimouse/lightsensors",LightSensorValues,sensors_callback)
 sub2 = rospy.Subscriber("/gazebo/model_states",ModelStates,position_callback)
 rospy.spin()
