@@ -85,6 +85,7 @@ def sensors_ave():
         got_average_flag = True
         for i in range(4):
             sensors_val[i] /= N
+        print "### _sensors_ave_ : ave=",sensors_val
     else:
         got_average_flag = False
 
@@ -131,7 +132,7 @@ def sensor_update():
     global particle
     alpha = 0.0
     if T != 1:
-        for i in 1000:
+        for i in range(1000):
             if episode_set[ particle[i][0] ][0] == latest_episode[0]: #過去のエピソードで得られた報酬が現在のものと等しい
                 l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
                 l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
@@ -141,8 +142,8 @@ def sensor_update():
             else:
                 particle[i][1] = 0.0
     elif T == 1:
-        for i in 1000:
-            particle[i][1] = [0.001]
+        for i in range(1000):
+            particle[i][1] = 0.001
 
     #alphaも求める
     for i in range(1000):
@@ -196,7 +197,7 @@ def decision_making(particle):
     if T == 1:#まだどんなエピソードも経験していないのでランダムに行動させる
         return random.choice("frl")
         
-    vote = range(1000):#各パーティクルが自分の所属しているエピソードに対して持つ評価
+    vote = range(1000)#各パーティクルが自分の所属しているエピソードに対して持つ評価
     for i in range(1000):
         vote[i] = 0.0
     else:#各パーティクルが投票で決める
@@ -235,17 +236,20 @@ def decision_making(particle):
 ######################################################
 def stop(action):
     global moving_flag
+    print "###_stop_:センサの合計:",sum(sensors_val)
     if action == "f":
-        if sum(latest_sen) >= fw_threshold:
+        if sum(sensors_val) >= fw_threshold:
             print "### _stop_:行動fは閾値によって中断された"
             moving_flag = False
         else:
+            print "### _sotep_:動き続けます"
             moving_flag = True
     else:
-        if latest_sen[0] + latest_sen[3] >= turn_threshold
+        if (sensors_val[0] + sensors_val[3]) >= turn_threshold:
             print "### _stop_:行動r or l は閾値によって中断された"
             moving_flag = False
         else:
+            print "### _stop_:動き続けます"
             moving_flag = True
 
 ##################################################
@@ -261,9 +265,12 @@ def sensors_callback(message):
     global sensors_val
     global counter
     global latest_sen
+    global moving_flag
     global T
+    global action
 
     counter += 1
+    print "###_sensors_callback_:counter = ",counter
 
     # センサデータを読み込む
     rf = message.right_forward
@@ -272,6 +279,7 @@ def sensors_callback(message):
     lf = message.left_forward
     sensors_ave() # N回分のセンサ値の平均を取る
     if got_average_flag == True and moving_flag == False:
+        print "###_sensors_callback_:リサンプリングとか色々します"
         for i in range(4):
             latest_sen[i] = sensors_val[i]
             sensors_val[i] = 0
@@ -297,6 +305,7 @@ def sensors_callback(message):
         T += 1
         moving_flag = True
     elif got_average_flag == True and moving_flag == True:
+        print "###_sensors_callback_:動かします"
         if action == "f":
             vel.linear.x = 0.1
         elif action == "r":
