@@ -97,25 +97,25 @@ def reward_check(x,y):
     global latest_episode
     if reward_arm == "right":
         if(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.01:
-            print "ロボットは正解に到達"
+            print "###_reward_check_:ロボットは正解に到達"
             latest_episode[0] = 1.0
             end_flag = True
         elif(x - 0.36) ** 2 + (y - 0.15) ** 2 <= 0.01:
-            print "ロボットは不正解に到達"
+            print "###_reward_check_:ロボットは不正解に到達"
             latest_episode[0] = -1.0
             end_flag = True
         else:
-            print "ロボットは行動を続行"
+            print "###_reward_check_:ロボットは行動を続行"
             latest_episode[0] = 0.0
             end_flag = False
 
     elif reward_arm == "left":
         if(x - 0.36) ** 2 + (y - 0.15) ** 2 <= 0.01:
-            print "ロボットは正解に到達"
+            print "###_reward_check_:ロボットは正解に到達"
             latest_episode[0] = 1.0
             end_flag = True
         elif(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.01:
-            print "ロボットは不正解に到達"
+            print "###_reward_check_:ロボットは不正解に到達"
             laetst_episode[0] = -1.0
             end_flag = True
         else:
@@ -171,9 +171,9 @@ def motion_update(particle):
                     likelihood[i] += particle[ii][1]
         #likelihoodの分布に基づき900個のパーティクルを配置する
         for i in range(900):
-            seed = random.randint(1,1000)
+            seed = random.randint(1,100)
             for ii in range(len(likelihood)):
-                seed -= likelihood[ii]
+                seed -= likelihood[ii] * 100
                 if seed <= 0:
                     particle[i][0] = ii
                     break
@@ -191,42 +191,41 @@ def motion_update(particle):
 ######################################
 #   投票によって行動を決定する関数   #
 #!!終了時の行動stayを追加した。この行動が評価されることが無いようにチェックする必要がある
+#追記:stay行動を取ったエピソードにも票が入る。これは仕方がないので、入った上でうまく処理するように変更する必要あり
 ######################################
 def decision_making(particle):
-    vote = range(1000):#各パーティクルが自分の所属しているエピソードに対して持つ評価
-    for i in (vote):
-        vote[i] = 0.0
     if T == 1:#まだどんなエピソードも経験していないのでランダムに行動させる
         return random.choice("frl")
+        
+    vote = range(1000):#各パーティクルが自分の所属しているエピソードに対して持つ評価
+    for i in range(1000):
+        vote[i] = 0.0
     else:#各パーティクルが投票で決める
         for i in range (1000):
             distance = 0 #パーティクルがいるエピソードとその直後の非ゼロ報酬が得られたエピソードとの距離
             non_zero_reward = 0.0
             for l in range(len(episode_set) - particle[i][0] - 1):
                 distance += 1
-                if episode_set[ particle[i][0] + distance ][0] != 0:
-                    non_zero_reward = float(episode_set[particle[i][0] + distance][0])
+                if episode_set[ particle[i][0] + distance ][0] != 0.0:
+                    non_zero_reward = episode_set[particle[i][0] + distance][0]
                     break
-            print "particle:",i," position:",particle[i][0]," distance:",distance," non_zero_reward:",non_zero_reward
             if non_zero_reward != 0:
                 vote[i] = non_zero_reward / distance
             else:
                 vote[i] = 0.0
-            print "vote:",vote[i]
 
     #voteに基づく行動決定。voteの合計がゼロやマイナスになる可能性がある点に注意
-    got = {"f":0.0,"r":0.0,"l":0.0}
+    got = {"f":0.0,"r":0.0,"l":0.0} # 得票数が入るディクショナリ
     for i in range(1000):
         if int(vote[i]) != 0:
-            print episode_set[particle[i][0]][5]
             got [episode_set[particle[i][0]] [5]] += vote[i]
-        print got
+        print "###_decision_making_:得票数=",got
         #グリーディならgotの中で最大の数字を持つもののキーをひとつ返す
         #参考:http://cointoss.hatenablog.com/entry/2013/10/16/123129
         if (random.randint(1,100) > epsiron):
             return max(gotitems(),key = lambda x:x[1])[0]
         else:
-            print "random_choice"
+            print "###_decision_making_:random_choice"
             return random.choice("frl")
 
 ######################################################
