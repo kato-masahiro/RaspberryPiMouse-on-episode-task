@@ -40,7 +40,7 @@ action = ""                           # 行動."f","r","l","s"の3種類(前進�
 moving_flag = False                   # ロボットが行動中かどうかのフラグ
 got_average_flag = False              # センサ値が平均値をとっているかどうかのフラグ
 end_flag = False                      # 非ゼロ報酬を得たらこのフラグが立って、すべての処理を終わらせる。
-fw_threshold = 3000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
+fw_threshold = 4000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
 turn_threshold = 2000                 # 旋回をやめるかどうかの判定に使われる閾値(rf+lf)
 particle = range(1000)                # パーティクルの位置、重みが入るリスト。パーティクルの重みの合計は1
 for i in particle:
@@ -86,7 +86,7 @@ def sensors_ave():
         got_average_flag = True
         for i in range(4):
             sensors_val[i] /= N
-       print "### _sensors_ave_ : ave=",sensors_val
+        print "### _sensors_ave_ : ave=",sensors_val
     else:
         got_average_flag = False
 
@@ -138,7 +138,9 @@ def sensor_update():
         print "###_sensor_update_###:episode_set",episode_set
         print "###_sensor_update_###:latest_episode",latest_episode
         for i in range(1000):
-            if episode_set[ particle[i][0] ][0] == latest_episode[0]: #過去のエピソードで得られた報酬が現在のものと等しい
+            print "int??", episode_set[particle[i][0]][0]
+            print "int??", latest_episode[0]
+            if int(episode_set[ particle[i][0] ][0]) == int(latest_episode[0]): #過去のエピソードで得られた報酬が現在のものと等しい
                 l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
                 l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
                 l3 = math.fabs(latest_episode[3] - episode_set[ particle[i][0] ][3])
