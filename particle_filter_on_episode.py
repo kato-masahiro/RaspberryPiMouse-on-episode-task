@@ -59,8 +59,6 @@ if os.path.exists("./particle.txt"):
     particle = eval(particle)
     f.close()
     print "ファイル:particle.txtを読み込みました"
-    print "---particle---"
-    print particle
 
 if os.path.exists("./episode_set.txt"):
     f = open("episode_set.txt","r")
@@ -69,8 +67,6 @@ if os.path.exists("./episode_set.txt"):
     f.close
     T = len(episode_set) + 1
     print "ファイル:episode_set.txtを読み込みました"
-    print "---episode_set---"
-    print episode_set
 
 ####################################
 #   センサの平均値を求める関数     #
@@ -221,6 +217,7 @@ def decision_making(particle):
     #voteに基づく行動決定。voteの合計がゼロやマイナスになる可能性がある点に注意
     got = {"f":0.0,"r":0.0,"l":0.0,"s":0.0} # 得票数が入るディクショナリ
     for i in range(1000):
+    ###tabun genin kore >>>!! AHO
         if int(vote[i]) != 0:
             got [episode_set[particle[i][0]] [5]] += vote[i]
         print "###_decision_making_:得票数=",got
@@ -296,10 +293,10 @@ def sensors_callback(message):
             print "###_sensors_callback_###:latest_episode=",latest_episode
             episode_set.append(list(latest_episode))
             #episode_set,particle をファイルに書き込んで終了
-            f = open("episode_set.txt","a")
+            f = open("episode_set.txt","w")
             f.write(str(episode_set))
             f.close()
-            f = open("particle.txt","a")
+            f = open("particle.txt","w")
             f.write(str(particle))
             f.close()
             sys.exit()
