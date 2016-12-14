@@ -32,7 +32,7 @@ reward_arm = "right"                  # 報酬が得られる腕。right or left
 x = 0.0; y = 0.0                      # ロボットの座標
 rf = 0; rs = 0; ls = 0; lf = 0        # センサ値
 sensors_val = [0,0,0,0]               # 平均を取るためにrf,rs,ls,lfの和を入れるための変数
-latest_sen = [0,0,0,0]                # ロボットが行動決定に用いる最新のセンサ値情報
+#latest_sen = [0,0,0,0]                # ロボットが行動決定に用いる最新のセンサ値情報
 counter = 0                           # sensors_callbackを何回実行したか
 N = 10                                # 何回分のセンサ値の平均を取って利用するか
 T = 1                                 # 最新の時間ステップ(いままで経験したエピソードの数+1)
@@ -86,7 +86,7 @@ def sensors_ave():
         got_average_flag = True
         for i in range(4):
             sensors_val[i] /= N
-        print "### _sensors_ave_ : ave=",sensors_val
+       print "### _sensors_ave_ : ave=",sensors_val
     else:
         got_average_flag = False
 
@@ -94,6 +94,7 @@ def sensors_ave():
 #     ロボットの位置で報酬値を決定     #
 ########################################
 def reward_check(x,y):
+    print "###_reward_check_###:episode_set",episode_set
     global end_flag
     global latest_episode
     if reward_arm == "right":
@@ -118,11 +119,11 @@ def reward_check(x,y):
             end_flag = True
         elif(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.01:
             print "###_reward_check_:ロボットは不正解に到達"
-            laetst_episode[0] = -1.0
+            latest_episode[0] = -1.0
             end_flag = True
         else:
             print "ロボットは行動を続行"
-            latest_episode[0] - 0.0
+            latest_episode[0] = 0.0
             end_flag = False
 
 #############################################################
@@ -134,7 +135,8 @@ def sensor_update():
     global particle
     alpha = 0.0
     if T != 1:
-        print "###_sensor_update_:episode_set",episode_set
+        print "###_sensor_update_###:episode_set",episode_set
+        print "###_sensor_update_###:latest_episode",latest_episode
         for i in range(1000):
             if episode_set[ particle[i][0] ][0] == latest_episode[0]: #過去のエピソードで得られた報酬が現在のものと等しい
                 l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
@@ -238,6 +240,7 @@ def decision_making(particle):
 #  センサ値が閾値を超えたらmoving_flagをFalseにする  #
 ######################################################
 def stop(action):
+    print"###_action_###:episode_set=",episode_set
     global moving_flag
     print "###_stop_:センサの合計:",sum(sensors_val)
     if action == "f":
@@ -267,10 +270,11 @@ def sensors_callback(message):
     global rf;global rs;global ls;global lf
     global sensors_val
     global counter
-    global latest_sen
     global moving_flag
     global T
     global action
+    global latest_episode
+    global episode_set
 
     counter += 1
 
@@ -280,18 +284,18 @@ def sensors_callback(message):
     ls = message.left_side
     lf = message.left_forward
     sensors_ave() # N回分のセンサ値の平均を取る
-    if got_average_flag == True and moving_flag == False:
-        print "###_sensors_callback_:リサンプリングとか色々します"
+    if got_average_flag == True and moving_flag == False and end_flag == False:
+        print "###_sensors_callback_:平均値OK,移動していない->リサンプリングとか色々します"
         for i in range(4):
-            latest_sen[i] = sensors_val[i]
+            latest_episode[i+1] = sensors_val[i]
             sensors_val[i] = 0
-            latest_episode[i + 1] = latest_sen[i] # 最新のepisode_setにlatest_senを追加
         reward_check(x,y)
         if end_flag == True:
             #センサ値、行動(stay)を書き込んで色々保存して終了
             print "###終了します"
             latest_episode[5] = "s"
-            episode_set.append(latest_episode)
+            print "###_sensors_callback_###:latest_episode=",latest_episode
+            episode_set.append(list(latest_episode))
             #episode_set,particle をファイルに書き込んで終了
             f = open("episode_set.txt","a")
             f.write(str(episode_set))
@@ -304,7 +308,8 @@ def sensors_callback(message):
         motion_update(particle) #尤度に基づきパーティクルの分布を更新する
         action = decision_making(particle) #パーティクルの投票に基づき行動を決定する
         latest_episode[5] = action #最新のepisode_setにactionを追加
-        episode_set.append(latest_episode)#一連のエピソードをエピソード集合に追加
+        print "###_sensors_callback_###:latest_episode=",latest_episode
+        episode_set.append(list(latest_episode))#一連のエピソードをエピソード集合に追加
         T += 1
         moving_flag = True
     elif got_average_flag == True and moving_flag == True:
