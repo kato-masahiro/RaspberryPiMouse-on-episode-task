@@ -32,7 +32,6 @@ reward_arm = "right"                  # 報酬が得られる腕。right or left
 x = 0.0; y = 0.0                      # ロボットの座標
 rf = 0; rs = 0; ls = 0; lf = 0        # センサ値
 sensors_val = [0,0,0,0]               # 平均を取るためにrf,rs,ls,lfの和を入れるための変数
-#latest_sen = [0,0,0,0]                # ロボットが行動決定に用いる最新のセンサ値情報
 counter = 0                           # sensors_callbackを何回実行したか
 N = 10                                # 何回分のセンサ値の平均を取って利用するか
 T = 1                                 # 最新の時間ステップ(いままで経験したエピソードの数+1)
@@ -57,19 +56,21 @@ epsiron = 10 #ランダムに行動する確率(グリーディではなく)
 if os.path.exists("./particle.txt"):
     f = open("particle.txt","r")
     particle = f.read()
+    particle = eval(particle)
     f.close()
     print "ファイル:particle.txtを読み込みました"
+    print "---particle---"
+    print particle
 
 if os.path.exists("./episode_set.txt"):
     f = open("episode_set.txt","r")
     episode_set = f.read()
+    episode_set = eval(episode_set)
     f.close
     T = len(episode_set) + 1
     print "ファイル:episode_set.txtを読み込みました"
     print "---episode_set---"
     print episode_set
-
-print episode_set
 
 ####################################
 #   センサの平均値を求める関数     #
@@ -135,12 +136,8 @@ def sensor_update():
     global particle
     alpha = 0.0
     if T != 1:
-        print "###_sensor_update_###:episode_set",episode_set
-        print "###_sensor_update_###:latest_episode",latest_episode
         for i in range(1000):
-            print "int??", episode_set[particle[i][0]][0]
-            print "int??", latest_episode[0]
-            if int(episode_set[ particle[i][0] ][0]) == int(latest_episode[0]): #過去のエピソードで得られた報酬が現在のものと等しい
+            if episode_set[ particle[i][0] ][0] == latest_episode[0]: #過去のエピソードで得られた報酬が現在のものと等しい
                 l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
                 l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
                 l3 = math.fabs(latest_episode[3] - episode_set[ particle[i][0] ][3])
