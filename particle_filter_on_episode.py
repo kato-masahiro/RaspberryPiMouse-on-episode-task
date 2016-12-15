@@ -32,6 +32,7 @@ reward_arm = args[1]
 ####################################
 #     グローバル変数の定義         #
 ####################################
+p = 10                                # パーティクルの数
 lmd = 20                              #retrospective_resettingの時、いくつのエピソードを残すか
 x = 0.0; y = 0.0                      # ロボットの座標
 rf = 0; rs = 0; ls = 0; lf = 0        # センサ値
@@ -47,9 +48,9 @@ end_flag = False                      # 非ゼロ報酬を得たらこのフラ�
 fw_threshold = 5000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
 turn_threshold = 2000                 # 旋回をやめるかどうかの判定に使われる閾値(rf+lf)
 alpha_threshold = 0.0                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
-particle = range(1000)                # パーティクルの位置、重みが入るリスト。パーティクルの重みの合計は1
+particle = range(p)                # パーティクルの位置、重みが入るリスト。パーティクルの重みの合計は1
 for i in particle:
-    particle[i] = [0, 0.001]
+    particle[i] = [0, 1.0/p]
 latest_episode = [0.0 ,0, 0, 0, 0,""] # 最新のエピソード。報酬値、センサ値、行動。
 episode_set = []                    # 過去のエピソードの集合。報酬値、センサ値、行動
 alpha = 0.0
@@ -148,8 +149,9 @@ def sensor_update():
     global particle
     alpha = 0.0
     if T != 1:
-        for i in range(1000):
-            if episode_set[ particle[i][0] ][0] == latest_episode[0]: #過去のエピソードで得られた報酬が現在のものと等しい
+        for i in range(p):
+            # !=かもしれない
+            if episode_set[ particle[i][0] ][0] != latest_episode[0]: #過去のエピソードで得られた報酬が現在のものと等しい
                 l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
                 l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
                 l3 = math.fabs(latest_episode[3] - episode_set[ particle[i][0] ][3])
@@ -158,35 +160,36 @@ def sensor_update():
             else:
                 particle[i][1] = 0.0
     elif T == 1:
-        for i in range(1000):
-            particle[i][1] = 0.001
+        for i in range(p):
+            particle[i][1] = 1.0/p
 
     #alphaも求める
-    for i in range(1000):
+    for i in range(p):
         alpha += particle[i][1]
-    print "###_sensor_update_###: alpha =",alpha
+    print "###_sensor_update_###: 各パーティクルの尤度の合計α = ",alpha
 
     #alphaで正規化
-    if alpha > 0.0:
-        for i in range(1000):
+    if alpha != 0.0:
+        for i in range(p):
             particle[i][1] /= alpha
     else:
-        for i in range(1000):
-            particle[i][1] = 0.001
+        for i in range(p):
+            particle[i][1] = 1.0/p
 
 #################################################################
 #   alphaが閾値より小さい時、retrospective_resettingを行う関数  #
 #################################################################
 def retrospective_resetting(alpha):
+    print"###_retrospective_resetting_###:alpha:",alpha
     global episode_set
     global particle
     if alpha < alpha_threshold:
         if len(episode_set) >= lmd:
-            print "###_retrospective_resetting_###:retrospective_resettingの実行"
+            print "###_retrospective_resetting_###:条件を満たしているためretrospective_resettingを行う"
             episode_set = episode_set[-lmd::]
-            for i in range(1000):
+            for i in range(p):
                 particle[i][0] = random.randint(0,lmd-1)
-                particle[i][1] = 0.001
+                particle[i][1] = 1.0/p
 
 ########################################################
 #   尤度に基づきパーティクルをリサンプリングする関数   #
@@ -197,11 +200,12 @@ def motion_update(particle):
         likelihood = range(len(episode_set))
         for i in range(len(likelihood)):#パーティクルの尤度からエピソードの尤度(likelihood)を求める
             likelihood[i] = 0.0
-            for ii in range (1000):
+            for ii in range (p):
                 if particle[ii][0] == i:
                     likelihood[i] += particle[ii][1]
-        #likelihoodの分布に基づき900個のパーティクルを配置する
-        for i in range(900):
+        print "###_motion_update_###:各エピソードの尤度 = ",likelihood
+        #likelihoodの分布に基づき8割のパーティクルを配置する
+        for i in range(int(p * 0.8)):
             seed = random.randint(1,100)
             for ii in range(len(likelihood)):
                 seed -= likelihood[ii] * 100
@@ -209,12 +213,12 @@ def motion_update(particle):
                     particle[i][0] = ii
                     break
         #likelihoodとは無関係に100個のパーティクルを配置する
-        for i in range(900,1000):            
+        for i in range(int(p * 0.8),p):            
            seed = random.randint(0,len(episode_set)-1)
            particle[i][0] = seed
 
     elif T == 0: 
-        for i in range(1000):
+        for i in range(p):
             particle[i][0] = 0
 
     return particle
@@ -229,11 +233,11 @@ def decision_making(particle):
     if T == 1:#まだどんなエピソードも経験していないのでランダムに行動させる
         return random.choice("frl")
         
-    vote = range(1000)#各パーティクルが自分の所属しているエピソードに対して持つ評価
-    for i in range(1000):
+    vote = range(p)#各パーティクルが自分の所属しているエピソードに対して持つ評価
+    for i in range(p):
         vote[i] = 0.0
     else:#各パーティクルが投票で決める
-        for i in range (1000):
+        for i in range (p):
             distance = 0 #パーティクルがいるエピソードとその直後の非ゼロ報酬が得られたエピソードとの距離
             non_zero_reward = 0.0
             for l in range(len(episode_set) - particle[i][0] - 1):
@@ -249,7 +253,7 @@ def decision_making(particle):
     #voteに基づく行動決定。voteの合計がゼロやマイナスになる可能性がある点に注意
     # got = {"f":0.0,"r":0.0,"l":0.0,"s":-10.0} # 得票数が入るディクショナリ
     got = [0.0 ,0.0 ,0.0 ,-10.0] #得票数が入るリスト f,r,l,sの順番
-    for i in range(1000):
+    for i in range(p):
         if vote[i] != 0.0:
             if episode_set[particle[i][0]][5] == "f":
                 got[0] += vote[i]
@@ -297,7 +301,6 @@ def decision_making(particle):
 ######################################################
 def stop(action):
     global moving_flag
-    print "###_stop_:センサの合計:",sum(sensors_val)
     if action == "f":
         if sum(sensors_val) >= fw_threshold:
             print "### _stop_:前に壁があるので前進は終了する"
@@ -369,7 +372,6 @@ def sensors_callback(message):
         T += 1
         moving_flag = True
     elif got_average_flag == True and moving_flag == True:
-        print "###_sensors_callback_:速度をsubscribeする"
         if action == "f":
             vel.linear.x = 0.2
         elif action == "r":
