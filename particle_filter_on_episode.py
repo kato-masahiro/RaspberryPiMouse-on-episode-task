@@ -25,10 +25,15 @@ from raspimouse_ros.msg import LightSensorValues
 from gazebo_msgs.msg import ModelStates
 from geometry_msgs.msg import Twist
 
+args = sys.argv
+
+reward_arm = "right"
+reward_arm = args[1]
+
 ####################################
 #     グローバル変数の定義         #
 ####################################
-reward_arm = "right"                  # 報酬が得られる腕。right or left
+lmd = 40                              #retrospective_resettingの時、いくつのエピソードを残すか
 x = 0.0; y = 0.0                      # ロボットの座標
 rf = 0; rs = 0; ls = 0; lf = 0        # センサ値
 sensors_val = [0,0,0,0]               # 平均を取るためにrf,rs,ls,lfの和を入れるための変数
@@ -39,8 +44,9 @@ action = ""                           # 行動."f","r","l","s"の3種類(前進�
 moving_flag = False                   # ロボットが行動中かどうかのフラグ
 got_average_flag = False              # センサ値が平均値をとっているかどうかのフラグ
 end_flag = False                      # 非ゼロ報酬を得たらこのフラグが立って、すべての処理を終わらせる。
-fw_threshold = 4000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
+fw_threshold = 5000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
 turn_threshold = 2000                 # 旋回をやめるかどうかの判定に使われる閾値(rf+lf)
+alpha_threshold = 0.0                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
 particle = range(1000)                # パーティクルの位置、重みが入るリスト。パーティクルの重みの合計は1
 for i in particle:
     particle[i] = [0, 0.001]
@@ -83,7 +89,6 @@ def sensors_ave():
         got_average_flag = True
         for i in range(4):
             sensors_val[i] /= N
-        print "### _sensors_ave_ : ave=",sensors_val
     else:
         got_average_flag = False
 
@@ -95,14 +100,14 @@ def reward_check(x,y):
     global latest_episode
     if reward_arm == "right":
         print "###_reward_check_:正解との距離:",(x-0.36) ** 2 + (y + 0.15) ** 2
-        if(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.01:
+        if(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.005:
             print "###_reward_check_:ロボットは正解に到達"
             f = open("result.txt","a")
             f.write("S")
             f.close()
             latest_episode[0] = 1.0
             end_flag = True
-        elif(x - 0.36) ** 2 + (y - 0.15) ** 2 <= 0.01:
+        elif(x - 0.36) ** 2 + (y - 0.15) ** 2 <= 0.005:
             print "###_reward_check_:ロボットは不正解に到達"
             f = open("result.txt","a")
             f.write("F")
@@ -115,14 +120,14 @@ def reward_check(x,y):
             end_flag = False
 
     elif reward_arm == "left":
-        if(x - 0.36) ** 2 + (y - 0.15) ** 2 <= 0.01:
+        if(x - 0.36) ** 2 + (y - 0.15) ** 2 <= 0.005:
             print "###_reward_check_:ロボットは正解に到達"
             f = open("result.txt","a")
             f.write("S")
             f.close()
             latest_episode[0] = 1.0
             end_flag = True
-        elif(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.01:
+        elif(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.005:
             print "###_reward_check_:ロボットは不正解に到達"
             f = open("result.txt","a")
             f.write("F")
@@ -159,6 +164,7 @@ def sensor_update():
     #alphaも求める
     for i in range(1000):
         alpha += particle[i][1]
+    print "###_sensor_update_###:alpha=",alpha
 
     #alphaで正規化
     if alpha > 0.0:
@@ -167,6 +173,20 @@ def sensor_update():
     else:
         for i in range(1000):
             particle[i][1] = 0.001
+
+#################################################################
+#   alphaが閾値より小さい時、retrospective_resettingを行う関数  #
+#################################################################
+def retrospective_resetting(alpha):
+    print "###_retrospective_resetting_###:やります" 
+    global episode_set
+    global particle
+    if alpha < alpha_threshold:
+        if len(episode_set) >= lmd:
+            episode_set = episode_set[-lmd::]
+            for i in range(1000):
+                particle[i][0] = random.randint(0,lmd-1)
+                particle[i][1] = 0.001
 
 ########################################################
 #   尤度に基づきパーティクルをリサンプリングする関数   #
@@ -226,20 +246,32 @@ def decision_making(particle):
                 vote[i] = 0.0
 
     #voteに基づく行動決定。voteの合計がゼロやマイナスになる可能性がある点に注意
-    got = {"f":0.0,"r":0.0,"l":0.0,"s":0.0} # 得票数が入るディクショナリ
+   # got = {"f":0.0,"r":0.0,"l":0.0,"s":-10.0} # 得票数が入るディクショナリ
+    got = [0.0 ,0.0 ,0.0 ,-10.0] #得票数が入るリスト f,r,l,sの順番
     for i in range(1000):
-        if vote[i] != 0:
-            got [ episode_set[particle[i][0]][5] ] += vote[i]
+        if vote[i] != 0.0:
+            if episode_set[particle[i][0]][5] == "f":
+                got[0] += vote[i]
+            elif episode_set[particle[i][0]][5] == "r":
+                got[1] += vote[i]
+            elif episode_set[particle[i][0]][5] == "l":
+                got[2] += vote[i]
         print "###_decision_making_###:得票数=",got
-        #グリーディならgotの中で最大の数字を持つもののキーをひとつ返す
-        #参考:http://cointoss.hatenablog.com/entry/2013/10/16/123129
+
+        #gotの中で最大値を持つ行動に対応した値をランダムに返す
         if (random.randint(1,100) > epsiron):
-            if max(got.items(),key = lambda x:x[1])[0] == "s":
-                print "###_decision_making_###:投票結果がsだった"
-                return random.choice("frl")
-            else:
-                print "###_decision_making_###:投票結果:",max(got.items(),key = lambda x:x[1])[0]
-                return max(got.items(),key = lambda x:x[1])[0]
+            while(True):
+                seed = random.randint(0,3)
+                if got[seed] == max(got):
+                    if seed == 0:
+                        return "f"
+                    elif seed == 1:
+                        return "r"
+                    elif seed == 2:
+                        return "l"
+                    elif seed == 3:
+                        return random.choice("frl")
+                    break
         else:
             print "###_decision_making_:random_choice"
             return random.choice("frl")
@@ -312,6 +344,7 @@ def sensors_callback(message):
             f.close()
             sys.exit()
         sensor_update() #パーティクル集合の尤度を求める
+        retrospective_resetting(alpha)
         motion_update(particle) #尤度に基づきパーティクルの分布を更新する
         action = decision_making(particle) #パーティクルの投票に基づき行動を決定する
         latest_episode[5] = action #最新のepisode_setにactionを追加
