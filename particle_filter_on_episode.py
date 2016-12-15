@@ -171,7 +171,7 @@ def sensor_update():
     print "###_sensor_update_###: 各パーティクルの尤度の合計α = ",alpha
 
     #alphaで正規化
-    if alpha != 0.0:
+    if math.fabs(alpha) >= 0.0001:
         for i in range(p):
             particle[i][1] /= alpha
     else:
