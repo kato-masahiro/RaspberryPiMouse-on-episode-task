@@ -151,7 +151,7 @@ def sensor_update():
     if T != 1:
         for i in range(p):
             # !=かもしれない
-            if episode_set[ particle[i][0] ][0] != latest_episode[0]: #過去のエピソードで得られた報酬が現在のものと等しい
+            if episode_set[ particle[i][0] ][0] == latest_episode[0]: #過去のエピソードで得られた報酬が現在のものと等しい
                 l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
                 l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
                 l3 = math.fabs(latest_episode[3] - episode_set[ particle[i][0] ][3])
@@ -162,6 +162,8 @@ def sensor_update():
     elif T == 1:
         for i in range(p):
             particle[i][1] = 1.0/p
+
+    print "###_sensor_update_###:各パーティクルの尤度 = ",particle
 
     #alphaも求める
     for i in range(p):
@@ -175,6 +177,7 @@ def sensor_update():
     else:
         for i in range(p):
             particle[i][1] = 1.0/p
+    print "###_sensor_update_###:正規化後のパーティクルの尤度 = ",particle
 
 #################################################################
 #   alphaが閾値より小さい時、retrospective_resettingを行う関数  #
@@ -221,6 +224,8 @@ def motion_update(particle):
         for i in range(p):
             particle[i][0] = 0
 
+    print "###_motion_update_###:リサンプリング後のパーティクル",particle
+
     return particle
 
 ######################################
@@ -230,13 +235,13 @@ def motion_update(particle):
 ######################################
 def decision_making(particle):
     global latest_sen
-    if T == 1:#まだどんなエピソードも経験していないのでランダムに行動させる
-        return random.choice("frl")
+    if T == 1:#まだどんなエピソードも経験していない 前進させる
+        return "f"
         
-    vote = range(p)#各パーティクルが自分の所属しているエピソードに対して持つ評価
-    for i in range(p):
-        vote[i] = 0.0
     else:#各パーティクルが投票で決める
+        vote = range(p)#各パーティクルが自分の所属しているエピソードに対して持つ評価
+        for i in range(p):
+            vote[i] = 0.0
         for i in range (p):
             distance = 0 #パーティクルがいるエピソードとその直後の非ゼロ報酬が得られたエピソードとの距離
             non_zero_reward = 0.0
@@ -250,8 +255,10 @@ def decision_making(particle):
             else:
                 vote[i] = 0.0
 
+        print "###_decision_making_###:パーティクル = ",particle
+        print "###_decision_making_###:各パーティクルが持つ票 = ",vote
+
     #voteに基づく行動決定。voteの合計がゼロやマイナスになる可能性がある点に注意
-    # got = {"f":0.0,"r":0.0,"l":0.0,"s":-10.0} # 得票数が入るディクショナリ
     got = [0.0 ,0.0 ,0.0 ,-10.0] #得票数が入るリスト f,r,l,sの順番
     for i in range(p):
         if vote[i] != 0.0:
@@ -271,9 +278,11 @@ def decision_making(particle):
                 if got[seed] == max(got):
                     if seed == 0:
                         if sum(latest_sen) >= fw_threshold:
-                            if vote[1] >= vote[2]:
+                            if vote[1] == vote[2]:
+                                return random.choice("rl")
+                            elif vote[1] > vote[2]:
                                 return "r"
-                            else:
+                            elif vote[1] < vote[2]:
                                 return "l"
                         else:
                             return "f"
