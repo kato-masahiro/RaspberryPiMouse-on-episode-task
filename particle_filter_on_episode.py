@@ -91,17 +91,22 @@ def sensors_ave():
 #     ロボットの位置で報酬値を決定     #
 ########################################
 def reward_check(x,y):
-    print "###_reward_check_###:episode_set",episode_set
     global end_flag
     global latest_episode
     if reward_arm == "right":
         print "###_reward_check_:正解との距離:",(x-0.36) ** 2 + (y + 0.15) ** 2
         if(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.01:
             print "###_reward_check_:ロボットは正解に到達"
+            f = open("result.txt","a")
+            f.write("S")
+            f.close()
             latest_episode[0] = 1.0
             end_flag = True
         elif(x - 0.36) ** 2 + (y - 0.15) ** 2 <= 0.01:
             print "###_reward_check_:ロボットは不正解に到達"
+            f = open("result.txt","a")
+            f.write("F")
+            f.close()
             latest_episode[0] = -1.0
             end_flag = True
         else:
@@ -112,10 +117,16 @@ def reward_check(x,y):
     elif reward_arm == "left":
         if(x - 0.36) ** 2 + (y - 0.15) ** 2 <= 0.01:
             print "###_reward_check_:ロボットは正解に到達"
+            f = open("result.txt","a")
+            f.write("S")
+            f.close()
             latest_episode[0] = 1.0
             end_flag = True
         elif(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.01:
             print "###_reward_check_:ロボットは不正解に到達"
+            f = open("result.txt","a")
+            f.write("F")
+            f.close()
             latest_episode[0] = -1.0
             end_flag = True
         else:
@@ -217,16 +228,17 @@ def decision_making(particle):
     #voteに基づく行動決定。voteの合計がゼロやマイナスになる可能性がある点に注意
     got = {"f":0.0,"r":0.0,"l":0.0,"s":0.0} # 得票数が入るディクショナリ
     for i in range(1000):
-    ###tabun genin kore >>>!! AHO
-        if int(vote[i]) != 0:
-            got [episode_set[particle[i][0]] [5]] += vote[i]
-        print "###_decision_making_:得票数=",got
+        if vote[i] != 0:
+            got [ episode_set[particle[i][0]][5] ] += vote[i]
+        print "###_decision_making_###:得票数=",got
         #グリーディならgotの中で最大の数字を持つもののキーをひとつ返す
         #参考:http://cointoss.hatenablog.com/entry/2013/10/16/123129
         if (random.randint(1,100) > epsiron):
             if max(got.items(),key = lambda x:x[1])[0] == "s":
+                print "###_decision_making_###:投票結果がsだった"
                 return random.choice("frl")
             else:
+                print "###_decision_making_###:投票結果:",max(got.items(),key = lambda x:x[1])[0]
                 return max(got.items(),key = lambda x:x[1])[0]
         else:
             print "###_decision_making_:random_choice"
@@ -236,7 +248,6 @@ def decision_making(particle):
 #  センサ値が閾値を超えたらmoving_flagをFalseにする  #
 ######################################################
 def stop(action):
-    print"###_action_###:episode_set=",episode_set
     global moving_flag
     print "###_stop_:センサの合計:",sum(sensors_val)
     if action == "f":
