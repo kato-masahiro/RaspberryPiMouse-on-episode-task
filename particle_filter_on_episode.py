@@ -27,16 +27,16 @@ from geometry_msgs.msg import Twist
 
 args = sys.argv
 
-reward_arm = "right"
 reward_arm = args[1]
 
 ####################################
 #     グローバル変数の定義         #
 ####################################
-lmd = 40                              #retrospective_resettingの時、いくつのエピソードを残すか
+lmd = 20                              #retrospective_resettingの時、いくつのエピソードを残すか
 x = 0.0; y = 0.0                      # ロボットの座標
 rf = 0; rs = 0; ls = 0; lf = 0        # センサ値
 sensors_val = [0,0,0,0]               # 平均を取るためにrf,rs,ls,lfの和を入れるための変数
+latest_sen = [0,0,0,0]
 counter = 0                           # sensors_callbackを何回実行したか
 N = 10                                # 何回分のセンサ値の平均を取って利用するか
 T = 1                                 # 最新の時間ステップ(いままで経験したエピソードの数+1)
@@ -54,7 +54,7 @@ latest_episode = [0.0 ,0, 0, 0, 0,""] # 最新のエピソード。報酬値、�
 episode_set = []                    # 過去のエピソードの集合。報酬値、センサ値、行動
 alpha = 0.0
 
-epsiron = 10 #ランダムに行動する確率(グリーディではなく)
+epsiron = 0 #ランダムに行動する確率(グリーディではなく)
 
 ###########################################################
 #    particle,episode_setについてファイルから読み込む     #
@@ -164,7 +164,7 @@ def sensor_update():
     #alphaも求める
     for i in range(1000):
         alpha += particle[i][1]
-    print "###_sensor_update_###:alpha=",alpha
+    print "###_sensor_update_###: alpha =",alpha
 
     #alphaで正規化
     if alpha > 0.0:
@@ -178,11 +178,11 @@ def sensor_update():
 #   alphaが閾値より小さい時、retrospective_resettingを行う関数  #
 #################################################################
 def retrospective_resetting(alpha):
-    print "###_retrospective_resetting_###:やります" 
     global episode_set
     global particle
     if alpha < alpha_threshold:
         if len(episode_set) >= lmd:
+            print "###_retrospective_resetting_###:retrospective_resettingの実行"
             episode_set = episode_set[-lmd::]
             for i in range(1000):
                 particle[i][0] = random.randint(0,lmd-1)
@@ -225,6 +225,7 @@ def motion_update(particle):
 #追記:stay行動を取ったエピソードにも票が入る。これは仕方がないので、入った上でうまく処理するように変更する必要あり
 ######################################
 def decision_making(particle):
+    global latest_sen
     if T == 1:#まだどんなエピソードも経験していないのでランダムに行動させる
         return random.choice("frl")
         
@@ -246,7 +247,7 @@ def decision_making(particle):
                 vote[i] = 0.0
 
     #voteに基づく行動決定。voteの合計がゼロやマイナスになる可能性がある点に注意
-   # got = {"f":0.0,"r":0.0,"l":0.0,"s":-10.0} # 得票数が入るディクショナリ
+    # got = {"f":0.0,"r":0.0,"l":0.0,"s":-10.0} # 得票数が入るディクショナリ
     got = [0.0 ,0.0 ,0.0 ,-10.0] #得票数が入るリスト f,r,l,sの順番
     for i in range(1000):
         if vote[i] != 0.0:
@@ -256,24 +257,39 @@ def decision_making(particle):
                 got[1] += vote[i]
             elif episode_set[particle[i][0]][5] == "l":
                 got[2] += vote[i]
-        print "###_decision_making_###:得票数=",got
+        print "###_decision_making_###:得票数 =",got
 
         #gotの中で最大値を持つ行動に対応した値をランダムに返す
+        #行動がセンサ地の合計に対して適切なものになるように調節する
         if (random.randint(1,100) > epsiron):
             while(True):
                 seed = random.randint(0,3)
                 if got[seed] == max(got):
                     if seed == 0:
-                        return "f"
+                        if sum(latest_sen) >= fw_threshold:
+                            if vote[1] >= vote[2]:
+                                return "r"
+                            else:
+                                return "l"
+                        else:
+                            return "f"
                     elif seed == 1:
-                        return "r"
+                        print "### decision_making ###:sum(latest_sen)=",sum(latest_sen)
+                        if sum(latest_sen) < fw_threshold:
+                            return "f"
+                        else:
+                            return "r"
                     elif seed == 2:
-                        return "l"
+                        print "### decision_making ###:sum(latest_sen)=",sum(latest_sen)
+                        if sum(latest_sen) < fw_threshold:
+                            return "f"
+                        else:
+                            return "l"
                     elif seed == 3:
                         return random.choice("frl")
                     break
         else:
-            print "###_decision_making_:random_choice"
+            print "###_decision_making_:"
             return random.choice("frl")
 
 ######################################################
@@ -284,17 +300,15 @@ def stop(action):
     print "###_stop_:センサの合計:",sum(sensors_val)
     if action == "f":
         if sum(sensors_val) >= fw_threshold:
-            print "### _stop_:行動fは閾値によって中断された"
+            print "### _stop_:前に壁があるので前進は終了する"
             moving_flag = False
         else:
-            print "### _sotep_:動き続けます"
             moving_flag = True
     else:
-        if (sensors_val[0] + sensors_val[3]) <= turn_threshold:
-            print "### _stop_:行動r or l は閾値によって中断された"
+        if sum(sensors_val) < fw_threshold:
+            print "### _stop_:前に壁がなくなったので旋回は終了する"
             moving_flag = False
         else:
-            print "### _stop_:動き続けます"
             moving_flag = True
 
 ##################################################
@@ -314,6 +328,7 @@ def sensors_callback(message):
     global action
     global latest_episode
     global episode_set
+    global latest_sen
 
     counter += 1
 
@@ -324,14 +339,15 @@ def sensors_callback(message):
     lf = message.left_forward
     sensors_ave() # N回分のセンサ値の平均を取る
     if got_average_flag == True and moving_flag == False and end_flag == False:
-        print "###_sensors_callback_:平均値OK,移動していない->リサンプリングとか色々します"
+        print "###_sensors_callback_:平均値OK,移動していない->リサンプリング,行動決定等を行う"
         for i in range(4):
             latest_episode[i+1] = sensors_val[i]
+            latest_sen[i] = sensors_val[i]
             sensors_val[i] = 0
         reward_check(x,y)
         if end_flag == True:
             #センサ値、行動(stay)を書き込んで色々保存して終了
-            print "###終了します"
+            print "###_sensors_callback_###:トライアルを終了します"
             latest_episode[5] = "s"
             print "###_sensors_callback_###:latest_episode=",latest_episode
             episode_set.append(list(latest_episode))
@@ -353,7 +369,7 @@ def sensors_callback(message):
         T += 1
         moving_flag = True
     elif got_average_flag == True and moving_flag == True:
-        print "###_sensors_callback_:動かします"
+        print "###_sensors_callback_:速度をsubscribeする"
         if action == "f":
             vel.linear.x = 0.2
         elif action == "r":
