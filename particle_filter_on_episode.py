@@ -32,8 +32,8 @@ reward_arm = args[1]
 ####################################
 #     グローバル変数の定義         #
 ####################################
-p = 10                                # パーティクルの数
-lmd = 20                              #retrospective_resettingの時、いくつのエピソードを残すか
+p = 20                                # パーティクルの数
+lmd = 12                              #retrospective_resettingの時、いくつのエピソードを残すか
 x = 0.0; y = 0.0                      # ロボットの座標
 rf = 0; rs = 0; ls = 0; lf = 0        # センサ値
 sensors_val = [0,0,0,0]               # 平均を取るためにrf,rs,ls,lfの和を入れるための変数
@@ -47,7 +47,7 @@ got_average_flag = False              # センサ値が平均値をとってい�
 end_flag = False                      # 非ゼロ報酬を得たらこのフラグが立って、すべての処理を終わらせる。
 fw_threshold = 5000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
 turn_threshold = 2000                 # 旋回をやめるかどうかの判定に使われる閾値(rf+lf)
-alpha_threshold = 0.0                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
+alpha_threshold = 0.2                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
 particle = range(p)                # パーティクルの位置、重みが入るリスト。パーティクルの重みの合計は1
 for i in particle:
     particle[i] = [0, 1.0/p]
@@ -261,49 +261,49 @@ def decision_making(particle):
     #voteに基づく行動決定。voteの合計がゼロやマイナスになる可能性がある点に注意
     got = [0.0 ,0.0 ,0.0 ,-10.0] #得票数が入るリスト f,r,l,sの順番
     for i in range(p):
-        if vote[i] != 0.0:
-            if episode_set[particle[i][0]][5] == "f":
-                got[0] += vote[i]
-            elif episode_set[particle[i][0]][5] == "r":
-                got[1] += vote[i]
-            elif episode_set[particle[i][0]][5] == "l":
-                got[2] += vote[i]
-        print "###_decision_making_###:得票数 =",got
+        if episode_set[particle[i][0]][5] == "f":
+            got[0] += vote[i]
+        elif episode_set[particle[i][0]][5] == "r":
+            got[1] += vote[i]
+        elif episode_set[particle[i][0]][5] == "l":
+            got[2] += vote[i]
+    print "###_decision_making_###:得票数 =",got
 
         #gotの中で最大値を持つ行動に対応した値をランダムに返す
         #行動がセンサ地の合計に対して適切なものになるように調節する
-        if (random.randint(1,100) > epsiron):
-            while(True):
-                seed = random.randint(0,3)
-                if got[seed] == max(got):
-                    if seed == 0:
-                        if sum(latest_sen) >= fw_threshold:
-                            if vote[1] == vote[2]:
-                                return random.choice("rl")
-                            elif vote[1] > vote[2]:
-                                return "r"
-                            elif vote[1] < vote[2]:
-                                return "l"
-                        else:
-                            return "f"
-                    elif seed == 1:
-                        print "### decision_making ###:sum(latest_sen)=",sum(latest_sen)
-                        if sum(latest_sen) < fw_threshold:
-                            return "f"
-                        else:
+    if (random.randint(1,100) > epsiron):
+        while(True):
+            seed = random.randint(0,3)
+            if got[seed] == max(got):
+                if seed == 0:
+                    if sum(latest_sen) >= fw_threshold:
+                        if got[1] == got[2]:
+                            return random.choice("rl")
+                        elif got[1] > got[2]:
                             return "r"
-                    elif seed == 2:
-                        print "### decision_making ###:sum(latest_sen)=",sum(latest_sen)
-                        if sum(latest_sen) < fw_threshold:
-                            return "f"
-                        else:
+                        elif got[1] < got[2]:
                             return "l"
-                    elif seed == 3:
-                        return random.choice("frl")
-                    break
-        else:
-            print "###_decision_making_:"
-            return random.choice("frl")
+                    else:
+                        return "f"
+                elif seed == 1:
+                    print "### decision_making ###:sum(latest_sen)=",sum(latest_sen)
+                    if sum(latest_sen) < fw_threshold:
+                        return "f"
+                    else:
+                        return "r"
+                elif seed == 2:
+                    print "### decision_making ###:sum(latest_sen)=",sum(latest_sen)
+                    if sum(latest_sen) < fw_threshold:
+                        return "f"
+                    else:
+                        return "l"
+                elif seed == 3:
+                    return random.choice("frl")
+                    print "###_decision_making_###:okasii"
+                break
+    else:
+        print "###_decision_making_:"
+        return random.choice("frl")
 
 ######################################################
 #  センサ値が閾値を超えたらmoving_flagをFalseにする  #
