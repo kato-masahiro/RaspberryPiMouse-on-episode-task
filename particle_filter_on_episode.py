@@ -47,7 +47,7 @@ got_average_flag = False              # センサ値が平均値をとってい�
 end_flag = False                      # 非ゼロ報酬を得たらこのフラグが立って、すべての処理を終わらせる。
 fw_threshold = 5000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
 turn_threshold = 2000                 # 旋回をやめるかどうかの判定に使われる閾値(rf+lf)
-alpha_threshold = 0.2                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
+alpha_threshold = 0.0                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
 particle = range(p)                # パーティクルの位置、重みが入るリスト。パーティクルの重みの合計は1
 for i in particle:
     particle[i] = [0, 1.0/p]
@@ -156,14 +156,16 @@ def sensor_update():
                 l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
                 l3 = math.fabs(latest_episode[3] - episode_set[ particle[i][0] ][3])
                 l4 = math.fabs(latest_episode[4] - episode_set[ particle[i][0] ][4])
-                particle[i][1] = 0.5 ** (l1+l2+l3+l4)
+                particle[i][1] = 0.5 ** ((l1+l2+l3+l4) / 4000)
             else:
                 particle[i][1] = 0.0
     elif T == 1:
         for i in range(p):
             particle[i][1] = 1.0/p
 
-    print "###_sensor_update_###:各パーティクルの尤度 = ",particle
+#   print "###_sensor_update_###:過去のエピソード集合 = ",episode_set
+#   print "###_sensor_update_###:今回のエピソード = ",latest_episode
+#   print "###_sensor_update_###:各パーティクルの尤度 = ",particle
 
     #alphaも求める
     for i in range(p):
@@ -183,7 +185,7 @@ def sensor_update():
 #   alphaが閾値より小さい時、retrospective_resettingを行う関数  #
 #################################################################
 def retrospective_resetting(alpha):
-    print"###_retrospective_resetting_###:alpha:",alpha
+#   print"###_retrospective_resetting_###:alpha:",alpha
     global episode_set
     global particle
     if alpha < alpha_threshold:
@@ -286,23 +288,23 @@ def decision_making(particle):
                     else:
                         return "f"
                 elif seed == 1:
-                    print "### decision_making ###:sum(latest_sen)=",sum(latest_sen)
+#                   print "### decision_making ###:sum(latest_sen)=",sum(latest_sen)
                     if sum(latest_sen) < fw_threshold:
                         return "f"
                     else:
                         return "r"
                 elif seed == 2:
-                    print "### decision_making ###:sum(latest_sen)=",sum(latest_sen)
+#                   print "### decision_making ###:sum(latest_sen)=",sum(latest_sen)
                     if sum(latest_sen) < fw_threshold:
                         return "f"
                     else:
                         return "l"
                 elif seed == 3:
                     return random.choice("frl")
-                    print "###_decision_making_###:okasii"
+#                   print "###_decision_making_###:okasii"
                 break
     else:
-        print "###_decision_making_:"
+#       print "###_decision_making_:"
         return random.choice("frl")
 
 ######################################################
@@ -312,13 +314,13 @@ def stop(action):
     global moving_flag
     if action == "f":
         if sum(sensors_val) >= fw_threshold:
-            print "### _stop_:前に壁があるので前進は終了する"
+#           print "### _stop_:前に壁があるので前進は終了する"
             moving_flag = False
         else:
             moving_flag = True
     else:
         if sum(sensors_val) < fw_threshold:
-            print "### _stop_:前に壁がなくなったので旋回は終了する"
+#           print "### _stop_:前に壁がなくなったので旋回は終了する"
             moving_flag = False
         else:
             moving_flag = True
