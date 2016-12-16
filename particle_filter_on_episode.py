@@ -32,7 +32,7 @@ reward_arm = args[1]
 ####################################
 #     グローバル変数の定義         #
 ####################################
-p = 20                                # パーティクルの数
+p = 1000                               # パーティクルの数
 lmd = 12                              #retrospective_resettingの時、いくつのエピソードを残すか
 x = 0.0; y = 0.0                      # ロボットの座標
 rf = 0; rs = 0; ls = 0; lf = 0        # センサ値
@@ -179,7 +179,7 @@ def sensor_update():
     else:
         for i in range(p):
             particle[i][1] = 1.0/p
-    print "###_sensor_update_###:正規化後のパーティクルの尤度 = ",particle
+    #print "###_sensor_update_###:正規化後のパーティクルの尤度 = ",particle
 
 #################################################################
 #   alphaが閾値より小さい時、retrospective_resettingを行う関数  #
@@ -226,7 +226,7 @@ def motion_update(particle):
         for i in range(p):
             particle[i][0] = 0
 
-    print "###_motion_update_###:リサンプリング後のパーティクル",particle
+    #print "###_motion_update_###:リサンプリング後のパーティクル",particle
 
     return particle
 
@@ -257,11 +257,11 @@ def decision_making(particle):
             else:
                 vote[i] = 0.0
 
-        print "###_decision_making_###:パーティクル = ",particle
-        print "###_decision_making_###:各パーティクルが持つ票 = ",vote
+        #print "###_decision_making_###:パーティクル = ",particle
+    #    print "###_decision_making_###:各パーティクルが持つ票 = ",vote
 
     #voteに基づく行動決定。voteの合計がゼロやマイナスになる可能性がある点に注意
-    got = [0.0 ,0.0 ,0.0 ,-10.0] #得票数が入るリスト f,r,l,sの順番
+    got = [0.0 ,0.0 ,0.0 ,-10000.0] #得票数が入るリスト f,r,l,sの順番
     for i in range(p):
         if episode_set[particle[i][0]][5] == "f":
             got[0] += vote[i]
@@ -280,27 +280,36 @@ def decision_making(particle):
                 if seed == 0:
                     if sum(latest_sen) >= fw_threshold:
                         if got[1] == got[2]:
+                            print"r or l で適当に"
                             return random.choice("rl")
                         elif got[1] > got[2]:
+                            print "旋回でどちらかといえばr"
                             return "r"
                         elif got[1] < got[2]:
+                            print "旋回でどちらかといえばl"
                             return "l"
                     else:
+                        print"###最大値的にf###"
                         return "f"
                 elif seed == 1:
 #                   print "### decision_making ###:sum(latest_sen)=",sum(latest_sen)
                     if sum(latest_sen) < fw_threshold:
+                        print"### 前に壁があるのでf ###"
                         return "f"
                     else:
+                        print"### 最大値的にr ###"
                         return "r"
                 elif seed == 2:
 #                   print "### decision_making ###:sum(latest_sen)=",sum(latest_sen)
                     if sum(latest_sen) < fw_threshold:
+                        print"### 前に壁があるのでf ###"
                         return "f"
                     else:
+                        print"### 最大値的にl ###"
                         return "l"
                 elif seed == 3:
-                    return random.choice("frl")
+                        print"### おかしい ###"
+                        return random.choice("frl")
 #                   print "###_decision_making_###:okasii"
                 break
     else:
@@ -353,12 +362,14 @@ def sensors_callback(message):
     lf = message.left_forward
     sensors_ave() # N回分のセンサ値の平均を取る
     if got_average_flag == True and moving_flag == False and end_flag == False:
-        print "###_sensors_callback_:平均値OK,移動していない->リサンプリング,行動決定等を行う"
+        print "=========================###_sensors_callback_###============================"
         for i in range(4):
             latest_episode[i+1] = sensors_val[i]
             latest_sen[i] = sensors_val[i]
             sensors_val[i] = 0
+
         reward_check(x,y)
+
         if end_flag == True:
             #センサ値、行動(stay)を書き込んで色々保存して終了
             print "###_sensors_callback_###:トライアルを終了します"
@@ -373,6 +384,7 @@ def sensors_callback(message):
             f.write(str(particle))
             f.close()
             sys.exit()
+
         sensor_update() #パーティクル集合の尤度を求める
         retrospective_resetting(alpha)
         motion_update(particle) #尤度に基づきパーティクルの分布を更新する
