@@ -47,7 +47,7 @@ got_average_flag = False              # センサ値が平均値をとってい�
 end_flag = False                      # 非ゼロ報酬を得たらこのフラグが立って、すべての処理を終わらせる。
 fw_threshold = 5000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
 turn_threshold = 2000                 # 旋回をやめるかどうかの判定に使われる閾値(rf+lf)
-alpha_threshold = 0.0                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
+alpha_threshold = 0.5                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
 particle = range(p)                # パーティクルの位置、重みが入るリスト。パーティクルの重みの合計は1
 for i in particle:
     particle[i] = [0, 1.0/p]
@@ -170,7 +170,7 @@ def sensor_update():
     #alphaも求める
     for i in range(p):
         alpha += particle[i][1]
-    print "###_sensor_update_###: 各パーティクルの尤度の合計α = ",alpha
+    print "###_sensor_update_###: 各パーティクルの尤度の合計α = ",alpha / p
 
     #alphaで正規化
     if math.fabs(alpha) >= 0.0001:
@@ -179,6 +179,8 @@ def sensor_update():
     else:
         for i in range(p):
             particle[i][1] = 1.0/p
+
+    alpha = alpha / p
     #print "###_sensor_update_###:正規化後のパーティクルの尤度 = ",particle
 
 #################################################################
@@ -334,6 +336,14 @@ def stop(action):
         else:
             moving_flag = True
 
+#########################################
+#   パーティクルをスライドさせる関数    #
+#########################################
+def slide(particle)
+    for i in range(p):
+        particle[i][0] += 1
+    return particle
+
 ##################################################
 #    センサ値をsubscribeするコールバック関数     #
 #   main
@@ -376,6 +386,7 @@ def sensors_callback(message):
             latest_episode[5] = "s"
             print "###_sensors_callback_###:latest_episode=",latest_episode
             episode_set.append(list(latest_episode))
+            particle = slide(particle)
             #episode_set,particle をファイルに書き込んで終了
             f = open("episode_set.txt","w")
             f.write(str(episode_set))
@@ -392,6 +403,8 @@ def sensors_callback(message):
         latest_episode[5] = action #最新のepisode_setにactionを追加
         print "###_sensors_callback_###:latest_episode=",latest_episode
         episode_set.append(list(latest_episode))#一連のエピソードをエピソード集合に追加
+        if T != 1:
+            particle = slide(particle)
         T += 1
         moving_flag = True
     elif got_average_flag == True and moving_flag == True:
