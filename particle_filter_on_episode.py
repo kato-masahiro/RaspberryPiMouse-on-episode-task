@@ -27,7 +27,11 @@ from geometry_msgs.msg import Twist
 
 args = sys.argv
 
-reward_arm = args[1]
+try:
+    reward_arm = args[1]
+except IndexError:
+    print "実行時に引数として'right'または'left'を指定してください"
+    sys.exit()
 
 ####################################
 #     グローバル変数の定義         #
@@ -211,11 +215,12 @@ def motion_update(particle):
                     # += -> = パーティクル１つ分の重み = そのエピソードの重みとする
                     likelihood[i] = particle[ii][1]
         l_sum = sum(likelihood)
-        print "l_sum (1以下のはず) = ",l_sum
-        print "###_motion_update_###:各エピソードの尤度 = ",likelihood
+        for i in range(len(likelihood)):
+            likelihood[i] = likelihood[i] * 1/l_sum
+        print "###_motion_update_###:各エピソードの尤度(合計はたぶん1) = ",likelihood
         #likelihoodの分布に基づき8割のパーティクルを配置する
         for i in range(int(p * 0.8)):
-            seed = random.randint(1,int(100*l_sum))
+            seed = random.randint(1,100)
             for ii in range(len(likelihood)):
                 seed -= likelihood[ii] * 100
                 if seed <= 0:
