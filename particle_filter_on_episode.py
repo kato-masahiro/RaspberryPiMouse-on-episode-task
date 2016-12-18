@@ -33,7 +33,7 @@ reward_arm = args[1]
 #     グローバル変数の定義         #
 ####################################
 p = 1000                               # パーティクルの数
-lmd = 12                              #retrospective_resettingの時、いくつのエピソードを残すか
+lmd = 12                            #retrospective_resettingの時、いくつのエピソードを残すか
 x = 0.0; y = 0.0                      # ロボットの座標
 rf = 0; rs = 0; ls = 0; lf = 0        # センサ値
 sensors_val = [0,0,0,0]               # 平均を取るためにrf,rs,ls,lfの和を入れるための変数
@@ -47,7 +47,7 @@ got_average_flag = False              # センサ値が平均値をとってい�
 end_flag = False                      # 非ゼロ報酬を得たらこのフラグが立って、すべての処理を終わらせる。
 fw_threshold = 5000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
 turn_threshold = 2000                 # 旋回をやめるかどうかの判定に使われる閾値(rf+lf)
-alpha_threshold = 0.5                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
+alpha_threshold = 0.0                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
 particle = range(p)                # パーティクルの位置、重みが入るリスト。パーティクルの重みの合計は1
 for i in particle:
     particle[i] = [0, 1.0/p]
@@ -180,7 +180,6 @@ def sensor_update():
         for i in range(p):
             particle[i][1] = 1.0/p
 
-    alpha = alpha / p
     #print "###_sensor_update_###:正規化後のパーティクルの尤度 = ",particle
 
 #################################################################
@@ -209,26 +208,33 @@ def motion_update(particle):
             likelihood[i] = 0.0
             for ii in range (p):
                 if particle[ii][0] == i:
-                    likelihood[i] += particle[ii][1]
+                    # += -> = パーティクル１つ分の重み = そのエピソードの重みとする
+                    likelihood[i] = particle[ii][1]
+        l_sum = sum(likelihood)
+        print "l_sum (1以下のはず) = ",l_sum
         print "###_motion_update_###:各エピソードの尤度 = ",likelihood
         #likelihoodの分布に基づき8割のパーティクルを配置する
         for i in range(int(p * 0.8)):
-            seed = random.randint(1,100)
+            seed = random.randint(1,int(100*l_sum))
             for ii in range(len(likelihood)):
                 seed -= likelihood[ii] * 100
                 if seed <= 0:
                     particle[i][0] = ii
                     break
-        #likelihoodとは無関係に100個のパーティクルを配置する
+        #likelihoodとは無関係に残りのパーティクルを配置する
         for i in range(int(p * 0.8),p):            
-           seed = random.randint(0,len(episode_set)-1)
-           particle[i][0] = seed
+            seed = random.randint(0,len(episode_set)-1)
+            particle[i][0] = seed
+
+        #パーティクルがどこにいくつあるか表示する
+        particle_numbers = [0 for i in range(len(episode_set))]
+        for i in range(p):
+            particle_numbers[particle[i][0]] += 1
+        print "!!! particle_numbers = ",particle_numbers
 
     elif T == 0: 
         for i in range(p):
             particle[i][0] = 0
-
-    #print "###_motion_update_###:リサンプリング後のパーティクル",particle
 
     return particle
 
@@ -339,10 +345,15 @@ def stop(action):
 #########################################
 #   パーティクルをスライドさせる関数    #
 #########################################
-def slide(particle)
+def slide():
+    global particle
     for i in range(p):
         particle[i][0] += 1
-    return particle
+    # 最新の行動と違うエピソードにいるパーティクルの重みはゼロにされる
+    print "最新の行動=",action
+    for i in range(p):
+        if episode_set [particle[i][0]] [5] != action:
+            particle[i][1] = 0.0
 
 ##################################################
 #    センサ値をsubscribeするコールバック関数     #
@@ -383,10 +394,14 @@ def sensors_callback(message):
         if end_flag == True:
             #センサ値、行動(stay)を書き込んで色々保存して終了
             print "###_sensors_callback_###:トライアルを終了します"
+            sensor_update()
+            retrospective_resetting(alpha)
+            motion_update(particle)
+            action = "s"
             latest_episode[5] = "s"
             print "###_sensors_callback_###:latest_episode=",latest_episode
             episode_set.append(list(latest_episode))
-            particle = slide(particle)
+            slide()
             #episode_set,particle をファイルに書き込んで終了
             f = open("episode_set.txt","w")
             f.write(str(episode_set))
@@ -404,7 +419,7 @@ def sensors_callback(message):
         print "###_sensors_callback_###:latest_episode=",latest_episode
         episode_set.append(list(latest_episode))#一連のエピソードをエピソード集合に追加
         if T != 1:
-            particle = slide(particle)
+            slide()
         T += 1
         moving_flag = True
     elif got_average_flag == True and moving_flag == True:
