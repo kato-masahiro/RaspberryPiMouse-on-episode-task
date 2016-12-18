@@ -45,6 +45,7 @@ latest_sen = [0,0,0,0]
 counter = 0                           # sensors_callbackを何回実行したか
 N = 10                                # 何回分のセンサ値の平均を取って利用するか
 T = 1                                 # 最新の時間ステップ(いままで経験したエピソードの数+1)
+T0 = 1
 action = ""                           # 行動."f","r","l","s"の3種類(前進、右旋回、左旋回,待機)待機は実際には行われない
 moving_flag = False                   # ロボットが行動中かどうかのフラグ
 got_average_flag = False              # センサ値が平均値をとっているかどうかのフラグ
@@ -77,6 +78,7 @@ if os.path.exists("./episode_set.txt"):
     episode_set = eval(episode_set)
     f.close
     T = len(episode_set) + 1
+    T0 = len(episode_set) + 1
     print "ファイル:episode_set.txtを読み込みました"
 
 ####################################
@@ -154,7 +156,6 @@ def sensor_update():
     alpha = 0.0
     if T != 1:
         for i in range(p):
-            # !=かもしれない
             if episode_set[ particle[i][0] ][0] == latest_episode[0]: #過去のエピソードで得られた報酬が現在のものと等しい
                 l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
                 l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
@@ -174,7 +175,7 @@ def sensor_update():
     #alphaも求める
     for i in range(p):
         alpha += particle[i][1]
-    print "###_sensor_update_###: 各パーティクルの尤度の合計α = ",alpha / p
+    print "###_sensor_update_###: 各パーティクルの尤度の平均値α = ",alpha / p
 
     #alphaで正規化
     if math.fabs(alpha) >= 0.0001:
@@ -184,13 +185,10 @@ def sensor_update():
         for i in range(p):
             particle[i][1] = 1.0/p
 
-    #print "###_sensor_update_###:正規化後のパーティクルの尤度 = ",particle
-
 #################################################################
 #   alphaが閾値より小さい時、retrospective_resettingを行う関数  #
 #################################################################
 def retrospective_resetting(alpha):
-#   print"###_retrospective_resetting_###:alpha:",alpha
     global episode_set
     global particle
     if alpha < alpha_threshold:
@@ -213,11 +211,7 @@ def motion_update(particle):
             for ii in range (p):
                 if particle[ii][0] == i:
                     # += -> = パーティクル１つ分の重み = そのエピソードの重みとする
-                    likelihood[i] = particle[ii][1]
-        l_sum = sum(likelihood)
-        for i in range(len(likelihood)):
-            likelihood[i] = likelihood[i] * 1/l_sum
-        print "###_motion_update_###:各エピソードの尤度(合計はたぶん1) = ",likelihood
+                    likelihood[i] += particle[ii][1]
         #likelihoodの分布に基づき8割のパーティクルを配置する
         for i in range(int(p * 0.8)):
             seed = random.randint(1,100)
@@ -235,7 +229,7 @@ def motion_update(particle):
         particle_numbers = [0 for i in range(len(episode_set))]
         for i in range(p):
             particle_numbers[particle[i][0]] += 1
-        print "!!! particle_numbers = ",particle_numbers
+        print "particle_numbers = ",particle_numbers
 
     elif T == 0: 
         for i in range(p):
@@ -323,10 +317,9 @@ def decision_making(particle):
                 elif seed == 3:
                         print"### おかしい ###"
                         return random.choice("frl")
-#                   print "###_decision_making_###:okasii"
                 break
     else:
-#       print "###_decision_making_:"
+        print "###_decision_making_###:ランダムな行動決定"
         return random.choice("frl")
 
 ######################################################
@@ -354,7 +347,7 @@ def slide():
     global particle
     for i in range(p):
         particle[i][0] += 1
-    # 最新の行動と違うエピソードにいるパーティクルの重みはゼロにされる
+    # 最新の行動と違う行動を取ったエピソードにいるパーティクルの重みはゼロにされる
     print "最新の行動=",action
     for i in range(p):
         if episode_set [particle[i][0]] [5] != action:
@@ -399,6 +392,11 @@ def sensors_callback(message):
         if end_flag == True:
             #センサ値、行動(stay)を書き込んで色々保存して終了
             print "###_sensors_callback_###:トライアルを終了します"
+            print "T= ",T
+            print "T0 = ",T0
+            if (T - T0) != 3:
+                print "### エピソードの時間ステップが範囲外だったので取り消します ###"
+                sys.exit()
             sensor_update()
             retrospective_resetting(alpha)
             motion_update(particle)
