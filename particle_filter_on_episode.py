@@ -156,7 +156,7 @@ def sensor_update():
     alpha = 0.0
     if T != 1:
         for i in range(p):
-            if episode_set[ particle[i][0] ][0] == latest_episode[0]: #過去のエピソードで得られた報酬が現在のものと等しい
+            if episode_set[ particle[i][0] ][0] == latest_episode[0] and episode_set[particle[i][0]][5] == episode_set[-1][5]: #過去のエピソードで得られた報酬と取った行動が現在のものと等しい
                 l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
                 l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
                 l3 = math.fabs(latest_episode[3] - episode_set[ particle[i][0] ][3])
@@ -360,10 +360,6 @@ def slide():
         particle[i][0] += 1
     # 最新の行動と違う行動を取ったエピソードにいるパーティクルの重みはゼロにされる
     print "最新の行動=",action
-    print "↑の行動と違う行動エピソードに存在していたパーティクルの重みはゼロ"
-    for i in range(p):
-        if episode_set [particle[i][0] - 1] [5] != action:
-            particle[i][1] = 0.0
 
 ##################################################
 #    センサ値をsubscribeするコールバック関数     #
