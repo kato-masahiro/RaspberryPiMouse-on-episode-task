@@ -232,6 +232,15 @@ def motion_update(particle):
         particle_numbers = [0 for i in range(len(episode_set))]
         for i in range(p):
             particle_numbers[particle[i][0]] += 1
+        print "===パーティクルの分布==="
+        cnt = 0
+        for i in range(len(particle_numbers)):
+            print particle_numbers[i],
+            cnt += 1
+            if cnt % 4 == 0:
+                print " "
+        print "T"
+
         print "particle_numbers = ",particle_numbers
 
     elif T == 0: 
