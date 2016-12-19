@@ -216,7 +216,7 @@ def motion_update(particle):
             likelihood[i] = likelihood[i]/l_sum
         print "likelihood(合計は1):",likelihood
         #likelihoodの分布に基づき8割のパーティクルを配置する
-        for i in range(int(p * 0.8)):
+        for i in range(int(p * 0.9)):
             seed = random.randint(1,100)
             for ii in range(len(likelihood)):
                 seed -= likelihood[ii] * 100
@@ -224,7 +224,7 @@ def motion_update(particle):
                     particle[i][0] = ii
                     break
         #likelihoodとは無関係に残りのパーティクルを配置する
-        for i in range(int(p * 0.8),p):            
+        for i in range(int(p * 0.9),p):            
             seed = random.randint(0,len(episode_set)-1)
             particle[i][0] = seed
 
@@ -240,8 +240,6 @@ def motion_update(particle):
             if cnt % 4 == 0:
                 print " "
         print "T"
-
-        print "particle_numbers = ",particle_numbers
 
     elif T == 0: 
         for i in range(p):
@@ -362,8 +360,9 @@ def slide():
         particle[i][0] += 1
     # 最新の行動と違う行動を取ったエピソードにいるパーティクルの重みはゼロにされる
     print "最新の行動=",action
+    print "↑の行動と違う行動エピソードに存在していたパーティクルの重みはゼロ"
     for i in range(p):
-        if episode_set [particle[i][0]] [5] != action:
+        if episode_set [particle[i][0] - 1] [5] != action:
             particle[i][1] = 0.0
 
 ##################################################
