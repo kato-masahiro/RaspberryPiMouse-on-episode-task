@@ -106,7 +106,7 @@ def reward_check(x,y):
     global end_flag
     global latest_episode
     if reward_arm == "right":
-        print "###_reward_check_:正解との距離:",(x-0.36) ** 2 + (y + 0.15) ** 2
+    #   print "###_reward_check_:正解との距離:",(x-0.36) ** 2 + (y + 0.15) ** 2
         if(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.005:
             print "###_reward_check_:ロボットは正解に到達"
             f = open("result.txt","a")
@@ -122,7 +122,7 @@ def reward_check(x,y):
             latest_episode[0] = -1.0
             end_flag = True
         else:
-            print "###_reward_check_:ロボットは行動を続行"
+    #       print "###_reward_check_:ロボットは行動を続行"
             latest_episode[0] = 0.0
             end_flag = False
 
@@ -142,7 +142,7 @@ def reward_check(x,y):
             latest_episode[0] = -1.0
             end_flag = True
         else:
-            print "ロボットは行動を続行"
+    #       print "ロボットは行動を続行"
             latest_episode[0] = 0.0
             end_flag = False
 
@@ -164,6 +164,7 @@ def sensor_update():
                 particle[i][1] = 0.5 ** ((l1+l2+l3+l4) / 4000)
             else:
                 particle[i][1] = 0.0
+    #        print "###_sensor_update_###:エピソード",particle[i][0],"に存在するパーティクルNo",i,"の尤度は",particle[i][1],"と判定されました。"
     elif T == 1:
         for i in range(p):
             particle[i][1] = 1.0/p
@@ -205,13 +206,15 @@ def retrospective_resetting(alpha):
 ########################################################
 def motion_update(particle):
     if T != 1: #重みに基づいてリサンプリング
-        likelihood = range(len(episode_set))
+        likelihood = [0.0 for i in range(len(episode_set))]
         for i in range(len(likelihood)):#パーティクルの尤度からエピソードの尤度(likelihood)を求める
-            likelihood[i] = 0.0
             for ii in range (p):
                 if particle[ii][0] == i:
-                    # += -> = パーティクル１つ分の重み = そのエピソードの重みとする
-                    likelihood[i] += particle[ii][1]
+                    likelihood[i] = particle[ii][1]
+        l_sum = sum(likelihood)
+        for i in range(len(likelihood)):
+            likelihood[i] = likelihood[i]/l_sum
+        print "likelihood(合計は1):",likelihood
         #likelihoodの分布に基づき8割のパーティクルを配置する
         for i in range(int(p * 0.8)):
             seed = random.randint(1,100)
@@ -344,6 +347,7 @@ def stop(action):
 #   パーティクルをスライドさせる関数    #
 #########################################
 def slide():
+    print "すべてのパーティクルをひとつずらした"
     global particle
     for i in range(p):
         particle[i][0] += 1
