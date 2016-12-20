@@ -33,11 +33,9 @@ except IndexError:
     print "実行時に引数として'right'または'left'を指定してください"
     sys.exit()
 
-####################################
-#     グローバル変数の定義         #
-####################################
+# グローバル変数の定義
 p = 1000                               # パーティクルの数
-lmd = 12                            #retrospective_resettingの時、いくつのエピソードを残すか
+lmd = 12                              #retrospective_resettingの時、いくつのエピソードを残すか
 x = 0.0; y = 0.0                      # ロボットの座標
 rf = 0; rs = 0; ls = 0; lf = 0        # センサ値
 sensors_val = [0,0,0,0]               # 平均を取るためにrf,rs,ls,lfの和を入れるための変数
@@ -212,10 +210,7 @@ def motion_update(particle):
         for i in range(len(likelihood)):#パーティクルの尤度からエピソードの尤度(likelihood)を求める
             for ii in range (p):
                 if particle[ii][0] == i:
-                    likelihood[i] = particle[ii][1]
-        l_sum = sum(likelihood)
-        for i in range(len(likelihood)):
-            likelihood[i] = likelihood[i]/l_sum
+                    likelihood[i]+= particle[ii][1]
         print "likelihood(合計は1):",likelihood
         #likelihoodの分布に基づき8割のパーティクルを配置する
         for i in range(int(p * 0.9)):
