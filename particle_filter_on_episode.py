@@ -160,8 +160,7 @@ def sensor_update(particle):
     alpha = 0.0
     if T != 1:
         for i in range(p):
-            particle[i][0] += 1
-            if episode_set[ particle[i][0] ][0] == latest_episode[0]\
+            if episode_set[ particle[i][0] ][0] == latest_episode[0] \
             and episode_set[ particle[i][0] -1 ][5] == episode_set[-1][5]:
                 l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
                 l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
@@ -353,6 +352,17 @@ def stop(action):
         else:
             moving_flag = True
 
+def slide(particle):
+    """
+    すべてのパーティクルの位置を一つ＋１する
+    引数:particle
+    戻り値:particle
+    """
+    print "パーティクルをスライドさせた"
+    for i in range(p):
+        particle[i][0] += 1
+    return particle
+
 ##################################################
 #    センサ値をsubscribeするコールバック関数     #
 #   main
@@ -371,6 +381,7 @@ def sensors_callback(message):
     global latest_episode
     global episode_set
     global latest_sen
+    global particle
 
     counter += 1
 
@@ -404,6 +415,7 @@ def sensors_callback(message):
             latest_episode[5] = "s"
             print "###_sensors_callback_###:latest_episode=",latest_episode
             episode_set.append(list(latest_episode))
+            particle = slide(particle)
             #episode_set,particle をファイルに書き込んで終了
             f = open("episode_set.txt","w")
             f.write(str(episode_set))
@@ -413,13 +425,15 @@ def sensors_callback(message):
             f.close()
             sys.exit()
 
-        particle,alpha = sensor_update(particle) #パーティクル集合の尤度を求める
+        particle,alpha = sensor_update(particle) 
         retrospective_resetting(alpha)
         motion_update(particle) #尤度に基づきパーティクルの分布を更新する
         action = decision_making(particle) #パーティクルの投票に基づき行動を決定する
         latest_episode[5] = action #最新のepisode_setにactionを追加
         print "###_sensors_callback_###:latest_episode=",latest_episode
         episode_set.append(list(latest_episode))#一連のエピソードをエピソード集合に追加
+        if T > 1:
+            particle = slide(particle)
         T += 1
         moving_flag = True
     elif got_average_flag == True and moving_flag == True:
