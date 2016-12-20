@@ -146,17 +146,23 @@ def reward_check(x,y):
             latest_episode[0] = 0.0
             end_flag = False
 
-#############################################################
-#     パーティクルの尤度を求める関数                        #
-#  !! この関数の実行後、particle[][1]の和は必ず1になる !!   #
-#############################################################
-def sensor_update():
-    global alpha
-    global particle
+def sensor_update(particle):
+    """
+    パーティクルの尤度を更新し、αも求める
+    引数:particle
+    戻り値:particle,alpha
+    処理:
+        すべてのパーティクルの位置を一つづつスライドさせる
+        各パーティクルの重みを求める
+        αを求める
+        αを用いてパーティクルの重みを正規化する
+    """
     alpha = 0.0
     if T != 1:
         for i in range(p):
-            if episode_set[ particle[i][0] ][0] == latest_episode[0] and episode_set[particle[i][0]][5] == episode_set[-1][5]: #過去のエピソードで得られた報酬と取った行動が現在のものと等しい
+            particle[i][0] += 1
+            if episode_set[ particle[i][0] ][0] == latest_episode[0]\
+            and episode_set[ particle[i][0] -1 ][5] == episode_set[-1][5]:
                 l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
                 l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
                 l3 = math.fabs(latest_episode[3] - episode_set[ particle[i][0] ][3])
@@ -164,14 +170,9 @@ def sensor_update():
                 particle[i][1] = 0.5 ** ((l1+l2+l3+l4) / 4000)
             else:
                 particle[i][1] = 0.0
-    #        print "###_sensor_update_###:エピソード",particle[i][0],"に存在するパーティクルNo",i,"の尤度は",particle[i][1],"と判定されました。"
     elif T == 1:
         for i in range(p):
             particle[i][1] = 1.0/p
-
-#   print "###_sensor_update_###:過去のエピソード集合 = ",episode_set
-#   print "###_sensor_update_###:今回のエピソード = ",latest_episode
-#   print "###_sensor_update_###:各パーティクルの尤度 = ",particle
 
     #alphaも求める
     for i in range(p):
@@ -185,6 +186,8 @@ def sensor_update():
     else:
         for i in range(p):
             particle[i][1] = 1.0/p
+
+    return particle,alpha
 
 #################################################################
 #   alphaが閾値より小さい時、retrospective_resettingを行う関数  #
@@ -350,17 +353,6 @@ def stop(action):
         else:
             moving_flag = True
 
-#########################################
-#   パーティクルをスライドさせる関数    #
-#########################################
-def slide():
-    print "すべてのパーティクルをひとつずらした"
-    global particle
-    for i in range(p):
-        particle[i][0] += 1
-    # 最新の行動と違う行動を取ったエピソードにいるパーティクルの重みはゼロにされる
-    print "最新の行動=",action
-
 ##################################################
 #    センサ値をsubscribeするコールバック関数     #
 #   main
@@ -405,14 +397,13 @@ def sensors_callback(message):
             if (T - T0) != 3:
                 print "### エピソードの時間ステップが範囲外だったので取り消します ###"
                 sys.exit()
-            sensor_update()
+            particle,alpha = sensor_update(particle)
             retrospective_resetting(alpha)
             motion_update(particle)
             action = "s"
             latest_episode[5] = "s"
             print "###_sensors_callback_###:latest_episode=",latest_episode
             episode_set.append(list(latest_episode))
-            slide()
             #episode_set,particle をファイルに書き込んで終了
             f = open("episode_set.txt","w")
             f.write(str(episode_set))
@@ -422,15 +413,13 @@ def sensors_callback(message):
             f.close()
             sys.exit()
 
-        sensor_update() #パーティクル集合の尤度を求める
+        particle,alpha = sensor_update(particle) #パーティクル集合の尤度を求める
         retrospective_resetting(alpha)
         motion_update(particle) #尤度に基づきパーティクルの分布を更新する
         action = decision_making(particle) #パーティクルの投票に基づき行動を決定する
         latest_episode[5] = action #最新のepisode_setにactionを追加
         print "###_sensors_callback_###:latest_episode=",latest_episode
         episode_set.append(list(latest_episode))#一連のエピソードをエピソード集合に追加
-        if T != 1:
-            slide()
         T += 1
         moving_flag = True
     elif got_average_flag == True and moving_flag == True:
