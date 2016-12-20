@@ -80,10 +80,8 @@ if os.path.exists("./episode_set.txt"):
     T0 = len(episode_set) + 1
     print "ファイル:episode_set.txtを読み込みました"
 
-####################################
-#   センサの平均値を求める関数     #
-####################################
 def sensors_ave():
+    """センサの平均値を求める"""
     global rf;global rs;global ls;global lf
     global sensors_val
     global got_average_flag
@@ -98,10 +96,10 @@ def sensors_ave():
     else:
         got_average_flag = False
 
-########################################
-#     ロボットの位置で報酬値を決定     #
-########################################
 def reward_check(x,y):
+    """
+    ロボットの位置に基づき、正解・不正解・行動の続行等を決定する
+    """
     global end_flag
     global latest_episode
     if reward_arm == "right":
@@ -172,8 +170,6 @@ def sensor_update(particle):
     #alphaも求める
     for i in range(p):
         alpha += particle[i][1]
-    print "###_sensor_update_###: 各パーティクルの尤度の平均値α = ",alpha / p
-
     #alphaで正規化
     if math.fabs(alpha) >= 0.0001:
         for i in range(p):
@@ -181,13 +177,12 @@ def sensor_update(particle):
     else:
         for i in range(p):
             particle[i][1] = 1.0/p
-
+    alpha /= p
+    print "alpha:",alpha
     return particle,alpha
 
-#################################################################
-#   alphaが閾値より小さい時、retrospective_resettingを行う関数  #
-#################################################################
 def retrospective_resetting(alpha):
+    """alphaに基づいてretrospective_resettingを行う"""
     global episode_set
     global particle
     if alpha < alpha_threshold:
@@ -198,18 +193,19 @@ def retrospective_resetting(alpha):
                 particle[i][0] = random.randint(0,lmd-1)
                 particle[i][1] = 1.0/p
 
-########################################################
-#   尤度に基づきパーティクルをリサンプリングする関数   #
-#  パーティクルがいないエピソードができないように注意  #
-########################################################
 def motion_update(particle):
+    """
+    尤度に基づいてパーティクルをリサンプリングする関数
+    リサンプリング後のパーティクルの分布も表示する
+    引数:particle
+    戻り値:particle
+    """
     if T != 1: #重みに基づいてリサンプリング
         likelihood = [0.0 for i in range(len(episode_set))]
         for i in range(len(likelihood)):#パーティクルの尤度からエピソードの尤度(likelihood)を求める
             for ii in range (p):
                 if particle[ii][0] == i:
                     likelihood[i]+= particle[ii][1]
-        print "likelihood(合計は1):",likelihood
         #likelihoodの分布に基づき8割のパーティクルを配置する
         for i in range(int(p * greedy_particles)):
             seed = random.randint(1,100)
@@ -230,7 +226,7 @@ def motion_update(particle):
         print "===パーティクルの分布==="
         cnt = 0
         for i in range(len(particle_numbers)):
-            print particle_numbers[i],
+            print particle_numbers[i],"\t",
             cnt += 1
             if cnt % 4 == 0:
                 print " "
@@ -268,7 +264,7 @@ def decision_making(particle,latest_episode):
             else:
                 vote[i] = 0.0
 
-    print "latest_センサ値:",latest_episode[1:5]
+    print "センサ値:",latest_episode[1:5]
     #voteに基づく行動決定。voteの合計がゼロやマイナスになる可能性がある点に注意
     got = [0.0 ,0.0 ,0.0 ,0.0] #得票数が入るリスト f,r,l,sの順番
     for i in range(p):
@@ -292,20 +288,18 @@ def decision_making(particle,latest_episode):
     else:
         print("###_decision_making_###:error")
 
-######################################################
-#  センサ値が閾値を超えたらmoving_flagをFalseにする  #
-######################################################
 def stop(action):
+    """
+    閾値によってmoving_flagをオンオフする
+    """
     global moving_flag
     if action == "f":
         if sum(sensors_val) >= fw_threshold:
-#           print "### _stop_:前に壁があるので前進は終了する"
             moving_flag = False
         else:
             moving_flag = True
     else:
         if sum(sensors_val) < fw_threshold:
-#           print "### _stop_:前に壁がなくなったので旋回は終了する"
             moving_flag = False
         else:
             moving_flag = True
@@ -316,16 +310,15 @@ def slide(particle):
     引数:particle
     戻り値:particle
     """
-    print "パーティクルをスライドさせた"
     for i in range(p):
         particle[i][0] += 1
     return particle
 
-##################################################
-#    センサ値をsubscribeするコールバック関数     #
-#   main
-##################################################
 def sensors_callback(message):
+    """
+    センサ値をsubscribeするコールバック関数
+    main
+    """
     vel = Twist()
     vel.linear.x = 0.0
     vel.angular.z = 0.0
@@ -358,12 +351,12 @@ def sensors_callback(message):
 
         if end_flag == True:
             #センサ値、行動(stay)を書き込んで色々保存して終了
-            print "###_sensors_callback_###:トライアルを終了します"
-            print "T= ",T
-            print "T0 = ",T0
+            print T/4," 回目のトライアルが終了しました"
+            print "==================================="
             if (T - T0) != 3:
                 print "### エピソードの時間ステップが範囲外だったので取り消します ###"
                 sys.exit()
+
             particle,alpha = sensor_update(particle)
             retrospective_resetting(alpha)
             motion_update(particle)
@@ -403,10 +396,8 @@ def sensors_callback(message):
 
     pub.publish(vel)
 
-#########################################################
-#   ロボットの現在位置をsubscribeするコールバック関数   #
-#########################################################
 def position_callback(message):
+    """ロボットの現在位置をsubscribeする関数"""
     global x;global y
     x = message.pose[-1].position.x
     y = message.pose[-1].position.y
