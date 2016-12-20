@@ -3,17 +3,19 @@
 """
 パーティクルフィルタでエピソード的タスクを学習させる
 
-while(報酬==0):
-    センサ値をN回取得して平均を取る
-    latest_sen = 平均
-    パーティクルを尤度関数を用いて再配置する(報酬は前回得たものを用いる)
-    パーティクルの投票で行動を決定する
-    前回の報酬、観測、行動をepisode_setに追加
-    while(行動終了の条件を満たさない):
-        一瞬だけ行動する
-        N回センサ値を取得して平均を取る
-    報酬を得る
-    報酬をlaetst_episodeに追加
+全体的な流れ:
+
+    while(報酬==0):
+        センサ値をN回取得して平均を取る
+        latest_sen = 平均
+      パーティクルを尤度関数を用いて再配置する(報酬は前回得たものを用いる)
+      パーティクルの投票で行動を決定する
+      前回の報酬、観測、行動をepisode_setに追加
+      while(行動終了の条件を満たさない):
+          一瞬だけ行動する
+          N回センサ値を取得して平均を取る
+      報酬を得る
+      報酬をlaetst_episodeに追加
 """
 import rospy
 import os
@@ -33,31 +35,31 @@ except IndexError:
     print "実行時に引数として'right'または'left'を指定してください"
     sys.exit()
 
-# グローバル変数の定義
-p = 1000                               # パーティクルの数
+# 変更可能なパラメータ
+p = 1000                              # パーティクルの数
 lmd = 12                              #retrospective_resettingの時、いくつのエピソードを残すか
+N = 10                                # 何回分のセンサ値の平均を取って利用するか
+fw_threshold = 5000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
+alpha_threshold = 0.0                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
+greedy_particles = 0.9                # パーティクルが尤度関数に基づいてリサンプリングされる確率
+
+# その他のグローバル変数
 x = 0.0; y = 0.0                      # ロボットの座標
 rf = 0; rs = 0; ls = 0; lf = 0        # センサ値
 sensors_val = [0,0,0,0]               # 平均を取るためにrf,rs,ls,lfの和を入れるための変数
 counter = 0                           # sensors_callbackを何回実行したか
-N = 10                                # 何回分のセンサ値の平均を取って利用するか
 T = 1                                 # 最新の時間ステップ(いままで経験したエピソードの数+1)
 T0 = 1
 action = ""                           # 行動."f","r","l","s"の3種類(前進、右旋回、左旋回,待機)待機は実際には行われない
 moving_flag = False                   # ロボットが行動中かどうかのフラグ
 got_average_flag = False              # センサ値が平均値をとっているかどうかのフラグ
 end_flag = False                      # 非ゼロ報酬を得たらこのフラグが立って、すべての処理を終わらせる。
-fw_threshold = 5000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
-turn_threshold = 2000                 # 旋回をやめるかどうかの判定に使われる閾値(rf+lf)
-alpha_threshold = 0.0                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
 particle = range(p)                # パーティクルの位置、重みが入るリスト。パーティクルの重みの合計は1
 for i in particle:
     particle[i] = [0, 1.0/p]
 latest_episode = [0.0 ,0, 0, 0, 0,""] # 最新のエピソード。報酬値、センサ値、行動。
 episode_set = []                    # 過去のエピソードの集合。報酬値、センサ値、行動
 alpha = 0.0
-
-epsiron = 0 #ランダムに行動する確率(グリーディではなく)
 
 ###########################################################
 #    particle,episode_setについてファイルから読み込む     #
@@ -103,7 +105,6 @@ def reward_check(x,y):
     global end_flag
     global latest_episode
     if reward_arm == "right":
-    #   print "###_reward_check_:正解との距離:",(x-0.36) ** 2 + (y + 0.15) ** 2
         if(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.005:
             print "###_reward_check_:ロボットは正解に到達"
             f = open("result.txt","a")
@@ -119,7 +120,6 @@ def reward_check(x,y):
             latest_episode[0] = -1.0
             end_flag = True
         else:
-    #       print "###_reward_check_:ロボットは行動を続行"
             latest_episode[0] = 0.0
             end_flag = False
 
@@ -139,7 +139,6 @@ def reward_check(x,y):
             latest_episode[0] = -1.0
             end_flag = True
         else:
-    #       print "ロボットは行動を続行"
             latest_episode[0] = 0.0
             end_flag = False
 
@@ -212,7 +211,7 @@ def motion_update(particle):
                     likelihood[i]+= particle[ii][1]
         print "likelihood(合計は1):",likelihood
         #likelihoodの分布に基づき8割のパーティクルを配置する
-        for i in range(int(p * 0.9)):
+        for i in range(int(p * greedy_particles)):
             seed = random.randint(1,100)
             for ii in range(len(likelihood)):
                 seed -= likelihood[ii] * 100
@@ -220,7 +219,7 @@ def motion_update(particle):
                     particle[i][0] = ii
                     break
         #likelihoodとは無関係に残りのパーティクルを配置する
-        for i in range(int(p * 0.9),p):            
+        for i in range(int(p * greedy_particles),p):            
             seed = random.randint(0,len(episode_set)-1)
             particle[i][0] = seed
 
