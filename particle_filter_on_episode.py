@@ -181,17 +181,19 @@ def sensor_update(particle):
     print "alpha:",alpha
     return particle,alpha
 
-def retrospective_resetting(alpha):
-    """alphaに基づいてretrospective_resettingを行う"""
+def retrospective_resetting():
+    """
+    retrospective_resettingを行う
+    処理:
+        エピソードを直近のいくつかだけを残して削除する
+        削除されたエピソードの中に、パーティクルを均等に配置する
+    """
     global episode_set
     global particle
-    if alpha < alpha_threshold:
-        if len(episode_set) >= lmd:
-            print "###_retrospective_resetting_###:条件を満たしているためretrospective_resettingを行う"
-            episode_set = episode_set[-lmd::]
-            for i in range(p):
-                particle[i][0] = random.randint(0,lmd-1)
-                particle[i][1] = 1.0/p
+    episode_set = episode_set[-lmd::]
+    for i in range(p):
+        particle[i][0] = random.randint(0,lmd-1)
+        particle[i][1] = 1.0/p
 
 def motion_update(particle):
     """
@@ -358,7 +360,10 @@ def sensors_callback(message):
                 sys.exit()
 
             particle,alpha = sensor_update(particle)
-            retrospective_resetting(alpha)
+            if alpha < alpha_threshold and len(episode_set) >= lmd:
+                print "retrospective_resettingを行う"
+                retrospective_resetting()
+                particle,alpha = sensor_update(particle)
             motion_update(particle)
             action = "s"
             latest_episode[5] = "s"
@@ -375,7 +380,10 @@ def sensors_callback(message):
             sys.exit()
 
         particle,alpha = sensor_update(particle) 
-        retrospective_resetting(alpha)
+        if alpha > alpha_threshold and len(episode_set) >= lmd:
+            print "retrospective_resettingを行う"
+            retrospective_resetting()
+            particle,alpha = sensor_update(particle)
         motion_update(particle) #尤度に基づきパーティクルの分布を更新する
         action = decision_making(particle,latest_episode) #パーティクルの投票に基づき行動を決定する
         latest_episode[5] = action #最新のepisode_setにactionを追加
