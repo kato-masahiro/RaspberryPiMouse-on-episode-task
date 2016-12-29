@@ -313,7 +313,7 @@ def slide(particle):
     """
     for i in range(p):
         particle[i][0] += 1
-        if episode_set[ particle[i][0] ][5] != latest_episode[5]:
+        if episode_set[ particle[i][0] -1 ][5] != latest_episode[5]:
             particle[i][1] = "X" #あとで(sensor_updateのとき)ゼロになる
     return particle
 
