@@ -37,10 +37,10 @@ except IndexError:
 
 # 変更可能なパラメータ
 p = 1000                              # パーティクルの数
-lmd = 12                              #retrospective_resettingの時、いくつのエピソードを残すか
-N = 10                                # 何回分のセンサ値の平均を取って利用するか
+lmd = 16                              #retrospective_resettingの時、いくつのエピソードを残すか
+N = 5                                # 何回分のセンサ値の平均を取って利用するか
 fw_threshold = 5000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
-alpha_threshold = 0.0                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
+alpha_threshold = 0.5                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
 greedy_particles = 0.9                # パーティクルが尤度関数に基づいてリサンプリングされる確率
 
 # その他のグローバル変数
@@ -154,15 +154,16 @@ def sensor_update(particle):
     alpha = 0.0
     if T != 1:
         for i in range(p):
+#            if episode_set[ particle[i][0] ][0] == latest_episode[0] \
+#            and episode_set[ particle[i][0] -1 ][5] == episode_set[-1][5]:
+            l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
+            l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
+            l3 = math.fabs(latest_episode[3] - episode_set[ particle[i][0] ][3])
+            l4 = math.fabs(latest_episode[4] - episode_set[ particle[i][0] ][4])
+            particle[i][1] = 0.5 ** ((l1+l2+l3+l4) / 4000)
             if episode_set[ particle[i][0] ][0] == latest_episode[0] \
             and episode_set[ particle[i][0] -1 ][5] == episode_set[-1][5]:
-                l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
-                l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
-                l3 = math.fabs(latest_episode[3] - episode_set[ particle[i][0] ][3])
-                l4 = math.fabs(latest_episode[4] - episode_set[ particle[i][0] ][4])
-                particle[i][1] = 0.5 ** ((l1+l2+l3+l4) / 4000)
-            else:
-                particle[i][1] = 0.0
+                particle[i][1] /= 2
     elif T == 1:
         for i in range(p):
             particle[i][1] = 1.0/p
@@ -380,7 +381,7 @@ def sensors_callback(message):
             sys.exit()
 
         particle,alpha = sensor_update(particle) 
-        if alpha > alpha_threshold and len(episode_set) >= lmd:
+        if alpha < alpha_threshold and len(episode_set) >= lmd:
             print "retrospective_resettingを行う"
             retrospective_resetting()
             particle,alpha = sensor_update(particle)
