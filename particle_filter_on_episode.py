@@ -79,6 +79,10 @@ if os.path.exists("./episode_set.txt"):
     T = len(episode_set) + 1
     T0 = len(episode_set) + 1
     print "ファイル:episode_set.txtを読み込みました"
+else:
+    f = open("result.txt","a")
+    f.write("---\n")
+    f.close()
 
 def sensors_ave():
     """センサの平均値を求める"""
@@ -106,14 +110,16 @@ def reward_check(x,y):
         if(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.005:
             print "###_reward_check_:ロボットは正解に到達"
             f = open("result.txt","a")
-            f.write("S")
+            f.write(reward_arm)
+            f.write(":O\n")
             f.close()
             latest_episode[0] = 1.0
             end_flag = True
         elif(x - 0.36) ** 2 + (y - 0.15) ** 2 <= 0.005:
             print "###_reward_check_:ロボットは不正解に到達"
             f = open("result.txt","a")
-            f.write("F")
+            f.write(reward_arm)
+            f.write(":X\n")
             f.close()
             latest_episode[0] = -1.0
             end_flag = True
@@ -125,14 +131,16 @@ def reward_check(x,y):
         if(x - 0.36) ** 2 + (y - 0.15) ** 2 <= 0.005:
             print "###_reward_check_:ロボットは正解に到達"
             f = open("result.txt","a")
-            f.write("S")
+            f.write(reward_arm)
+            f.write(":O\n")
             f.close()
             latest_episode[0] = 1.0
             end_flag = True
         elif(x - 0.36) ** 2 + (y + 0.15) ** 2 <= 0.005:
             print "###_reward_check_:ロボットは不正解に到達"
             f = open("result.txt","a")
-            f.write("F")
+            f.write(reward_arm)
+            f.write(":X\n")
             f.close()
             latest_episode[0] = -1.0
             end_flag = True
@@ -361,10 +369,13 @@ def sensors_callback(message):
             print "==================================="
             if (T - T0) != 3:
                 print "### エピソードの時間ステップが範囲外だったので取り消します ###"
+                f = open("result.txt","a")
+                f.write("↑:MISS!!\n")
+                f.close
                 sys.exit()
 
             particle,alpha = sensor_update(particle)
-            if alpha < alpha_threshold:
+            if alpha < alpha_threshold and T != 1:
                 retrospective_resetting()
                 particle,alpha = sensor_update(particle)
             motion_update(particle)
@@ -383,7 +394,7 @@ def sensors_callback(message):
             sys.exit()
 
         particle,alpha = sensor_update(particle) 
-        if alpha < alpha_threshold:
+        if alpha < alpha_threshold and T != 1:
             retrospective_resetting()
             particle,alpha = sensor_update(particle)
         motion_update(particle) #尤度に基づきパーティクルの分布を更新する
