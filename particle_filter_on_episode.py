@@ -42,6 +42,7 @@ N = 5                                # 何回分のセンサ値の平均を取�
 fw_threshold = 5000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
 alpha_threshold = 0.5                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
 greedy_particles = 0.9                # パーティクルが尤度関数に基づいてリサンプリングされる確率
+not_fit_reduce = 0.5                  # つじつまが合わないエピソードの尤度に掛けて削減する。0.0から1.0
 
 # その他のグローバル変数
 x = 0.0; y = 0.0                      # ロボットの座標
@@ -163,13 +164,17 @@ def sensor_update(particle):
     if T != 1:
         for i in range(p):
             if episode_set[ particle[i][0] ][0] == latest_episode[0] and particle[i][1] != "X":
+            l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
+            l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
+            l3 = math.fabs(latest_episode[3] - episode_set[ particle[i][0] ][3])
+            l4 = math.fabs(latest_episode[4] - episode_set[ particle[i][0] ][4])
+            particle[i][1] = 0.5 ** ((l1+l2+l3+l4) / 4000)
+            else:
                 l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
                 l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
                 l3 = math.fabs(latest_episode[3] - episode_set[ particle[i][0] ][3])
                 l4 = math.fabs(latest_episode[4] - episode_set[ particle[i][0] ][4])
-                particle[i][1] = 0.5 ** ((l1+l2+l3+l4) / 4000)
-            else:
-                particle[i][1] = 0.0
+                particle[i][1] = (0.5 ** ((l1+l2+l3+l4) / 4000)) * not_fit_reduce
     elif T == 1:
         for i in range(p):
             particle[i][1] = 1.0/p
