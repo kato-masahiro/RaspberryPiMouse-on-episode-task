@@ -40,7 +40,7 @@ p = 1000                              # パーティクルの数
 lmd = 16                              #retrospective_resettingの時、いくつのイベントを残すか
 N = 5                                # 何回分のセンサ値の平均を取って利用するか
 fw_threshold = 5000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
-alpha_threshold = 0.0                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
+alpha_threshold = 0.5                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
 greedy_particles = 0.9                # パーティクルが尤度関数に基づいてリサンプリングされる確率
 
 # その他のグローバル変数
@@ -184,14 +184,17 @@ def retrospective_resetting():
     """
     retrospective_resettingを行う
     処理:
-        エピソードを直近のいくつかだけを残して削除する
-        削除されたエピソードの中に、パーティクルを均等に配置する
+        パーティクルを、直近のlmd個のイベント中に均等に配置する
+        それぞれ尤度を求め、リサンプリングする
     """
     global episode_set
     global particle
-    episode_set = episode_set[-lmd::]
+    print "###_リセッティングをします_###"
+    print "###_resetting_###:エピソードの数:",len(episode_set),"より、",len(episode_set)-lmd,"から",len(episode_set)-1,"までの中から選ぶ"
     for i in range(p):
-        particle[i][0] = random.randint(0,lmd-1)
+        particle[i][0] = random.randint(len(episode_set)-lmd,len(episode_set)-1)
+        if particle[i][0] < 0:
+            particle[i][0] = random.randint(0,len(episode_set)-1)
         particle[i][1] = 1.0/p
 
 def motion_update(particle):
@@ -361,8 +364,7 @@ def sensors_callback(message):
                 sys.exit()
 
             particle,alpha = sensor_update(particle)
-            if alpha < alpha_threshold and len(episode_set) >= lmd:
-                print "リセッティングを行う"
+            if alpha < alpha_threshold:
                 retrospective_resetting()
                 particle,alpha = sensor_update(particle)
             motion_update(particle)
@@ -381,8 +383,7 @@ def sensors_callback(message):
             sys.exit()
 
         particle,alpha = sensor_update(particle) 
-        if alpha < alpha_threshold and len(episode_set) >= lmd:
-            print "リセッティングを行う"
+        if alpha < alpha_threshold:
             retrospective_resetting()
             particle,alpha = sensor_update(particle)
         motion_update(particle) #尤度に基づきパーティクルの分布を更新する
