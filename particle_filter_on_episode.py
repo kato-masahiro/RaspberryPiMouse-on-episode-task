@@ -38,11 +38,13 @@ except IndexError:
 # 変更可能なパラメータ
 p = 1000                              # パーティクルの数
 lmd = 16                              #retrospective_resettingの時、いくつのイベントを残すか
-N = 10                               # 何回分のセンサ値の平均を取って利用するか
+N = 10                                # 何回分のセンサ値の平均を取って利用するか
 fw_threshold = 5000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
-alpha_threshold = 0.5                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
+alpha_threshold = 0.1                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
 greedy_particles = 0.9                # パーティクルが尤度関数に基づいてリサンプリングされる確率
-not_fit_reduce = 1.0                  # つじつまが合わないエピソードの尤度に掛けて削減する。0.0から1.0
+not_fit_reduce = 0.5                  # つじつまが合わないエピソードの尤度に掛けて削減する。0.0から1.0
+sensitivity = 200                    # センサ値の差に応じて尤度を減少させるための値.\
+                                      # 小さいほどわづかな差で尤度が急激に減少する。本来(論文の設定)は4000。
 
 # その他のグローバル変数
 x = 0.0; y = 0.0                      # ロボットの座標
@@ -51,7 +53,7 @@ sensors_val = [0,0,0,0]               # 平均を取るためにrf,rs,ls,lfの�
 counter = 0                           # sensors_callbackを何回実行したか
 T = 1                                 # 最新の時間ステップ(いままで経験したエピソードの数+1)
 T0 = 1
-action = ""                           # 行動."f","r","l","s"の3種類(前進、右旋回、左旋回,待機)待機は実際には行われない
+action = ""                           # 行動."f","r","l","s"の3種類(前進、右旋回、左旋回,待機)
 moving_flag = False                   # ロボットが行動中かどうかのフラグ
 got_average_flag = False              # センサ値が平均値をとっているかどうかのフラグ
 end_flag = False                      # 非ゼロ報酬を得たらこのフラグが立って、すべての処理を終わらせる。
@@ -168,13 +170,13 @@ def sensor_update(particle):
                 l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
                 l3 = math.fabs(latest_episode[3] - episode_set[ particle[i][0] ][3])
                 l4 = math.fabs(latest_episode[4] - episode_set[ particle[i][0] ][4])
-                particle[i][1] = 0.5 ** ((l1+l2+l3+l4) / 500)
+                particle[i][1] = 0.5 ** ((l1+l2+l3+l4) / sensitivity)
             else:
                 l1 = math.fabs(latest_episode[1] - episode_set[ particle[i][0] ][1])
                 l2 = math.fabs(latest_episode[2] - episode_set[ particle[i][0] ][2])
                 l3 = math.fabs(latest_episode[3] - episode_set[ particle[i][0] ][3])
                 l4 = math.fabs(latest_episode[4] - episode_set[ particle[i][0] ][4])
-                particle[i][1] = (0.5 ** ((l1+l2+l3+l4) / 500)) * not_fit_reduce
+                particle[i][1] = (0.5 ** ((l1+l2+l3+l4) / sensitivity)) * not_fit_reduce
     elif T == 1:
         for i in range(p):
             particle[i][1] = 1.0/p
