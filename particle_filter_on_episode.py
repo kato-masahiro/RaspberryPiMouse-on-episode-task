@@ -40,10 +40,10 @@ p = 1000                              # パーティクルの数
 lmd = 16                              #retrospective_resettingの時、いくつのイベントを残すか
 N = 10                                # 何回分のセンサ値の平均を取って利用するか
 fw_threshold = 5000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
-alpha_threshold = 0.1                 # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
-greedy_particles = 0.9                # パーティクルが尤度関数に基づいてリサンプリングされる確率
-not_fit_reduce = 0.5                  # つじつまが合わないエピソードの尤度に掛けて削減する。0.0から1.0
-sensitivity = 200                    # センサ値の差に応じて尤度を減少させるための値.\
+alpha_threshold = 0.1                # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
+greedy_particles = 0.8                # パーティクルが尤度関数に基づいてリサンプリングされる確率
+not_fit_reduce = 0.4                  # つじつまが合わないエピソードの尤度に掛けて削減する。0.0から1.0
+sensitivity = 400                    # センサ値の差に応じて尤度を減少させるための値.\
                                       # 小さいほどわづかな差で尤度が急激に減少する。本来(論文の設定)は4000。
 
 # その他のグローバル変数
@@ -201,6 +201,7 @@ def retrospective_resetting():
     処理:
         パーティクルを、直近のlmd個のイベント中に均等に配置する
         それぞれ尤度を求め、リサンプリングする
+        リセッティングの結果尤度が減少した場合には取り消す。
     """
     global episode_set
     global particle
@@ -383,8 +384,13 @@ def sensors_callback(message):
 
             particle,alpha = sensor_update(particle)
             if alpha < alpha_threshold and T != 1:
+                p_alpha = alpha
+                p_particle = particle
                 retrospective_resetting()
                 particle,alpha = sensor_update(particle)
+                if p_alpha > alpha:
+                    print "リセットしないほうがマシだった"
+                    particle = p_particle
             motion_update(particle)
             action = "s"
             latest_episode[5] = "s"
@@ -402,8 +408,13 @@ def sensors_callback(message):
 
         particle,alpha = sensor_update(particle) 
         if alpha < alpha_threshold and T != 1:
+            p_alpha = alpha
+            p_particle = particle
             retrospective_resetting()
             particle,alpha = sensor_update(particle)
+            if p_alpha > alpha:
+                print "リセットしないほうがましだった"
+                particle = p_particle
         motion_update(particle) #尤度に基づきパーティクルの分布を更新する
         action = decision_making(particle,latest_episode) #パーティクルの投票に基づき行動を決定する
         latest_episode[5] = action #最新のepisode_setにactionを追加
