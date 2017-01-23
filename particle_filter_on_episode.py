@@ -37,14 +37,13 @@ except IndexError:
 
 # 変更可能なパラメータ
 p = 1000                              # パーティクルの数
-lmd = 16                              #retrospective_resettingの時、いくつのイベントを残すか
+lmd = 17                              #retrospective_resettingの時、いくつのイベントを残すか
 N = 10                                # 何回分のセンサ値の平均を取って利用するか
 fw_threshold = 5000                   # 前進をやめるかどうかの判定に使われる閾値(rf+rs+ls+lf)
-alpha_threshold = 0.1                # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
+alpha_threshold = 0.3                # retrospective_resettingを行うかどうかの閾値。0.0だと行わない。1.0だと常に行う。
 greedy_particles = 0.8                # パーティクルが尤度関数に基づいてリサンプリングされる確率
 not_fit_reduce = 0.4                  # つじつまが合わないエピソードの尤度に掛けて削減する。0.0から1.0
-sensitivity = 400                    # センサ値の差に応じて尤度を減少させるための値.\
-                                      # 小さいほどわづかな差で尤度が急激に減少する。本来(論文の設定)は4000。
+sensitivity = 600                    # センサ値の差に応じて尤度を減少させるための値.\
 
 # その他のグローバル変数
 x = 0.0; y = 0.0                      # ロボットの座標
@@ -205,8 +204,8 @@ def retrospective_resetting():
     """
     global episode_set
     global particle
-    print "###_リセッティングをします_###"
-    print "###_resetting_###:エピソードの数:",len(episode_set),"より、",len(episode_set)-lmd,"から",len(episode_set)-1,"までの中から選ぶ"
+    #print "###_リセッティングをします_###"
+    #print "###_resetting_###:エピソードの数:",len(episode_set),"より、",len(episode_set)-lmd,"から",len(episode_set)-1,"までの中から選ぶ"
     for i in range(p):
         particle[i][0] = random.randint(len(episode_set)-lmd,len(episode_set)-1)
         if particle[i][0] < 0:
@@ -243,6 +242,7 @@ def motion_update(particle):
         particle_numbers = [0 for i in range(len(episode_set))]
         for i in range(p):
             particle_numbers[particle[i][0]] += 1
+        """
         print "===パーティクルの分布==="
         cnt = 0
         for i in range(len(particle_numbers)):
@@ -251,6 +251,7 @@ def motion_update(particle):
             if cnt % 4 == 0:
                 print " "
         print "T"
+        """
 
     elif T == 0: 
         for i in range(p):
@@ -294,7 +295,7 @@ def decision_making(particle,latest_episode):
             got[1] += vote[i]
         elif episode_set[particle[i][0]][5] == "l":
             got[2] += vote[i]
-    print "###_decision_making_###:得票数 =",got
+    #print "###_decision_making_###:得票数 =",got
 
     #前に壁がなければ投票にかかわらず前進させる
     if sum(latest_episode[1:5]) < fw_threshold:
@@ -376,7 +377,9 @@ def sensors_callback(message):
             print T/4," 回目のトライアルが終了しました"
             print "==================================="
             if (T - T0) != 3:
+                print "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
                 print "### エピソードの時間ステップが範囲外だったので取り消します ###"
+                print "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
                 f = open("result.txt","a")
                 f.write("↑:MISS!!\n")
                 f.close
@@ -389,12 +392,12 @@ def sensors_callback(message):
                 retrospective_resetting()
                 particle,alpha = sensor_update(particle)
                 if p_alpha > alpha:
-                    print "リセットしないほうがマシだった"
+                    #print "リセットしないほうがマシだった"
                     particle = p_particle
             motion_update(particle)
             action = "s"
             latest_episode[5] = "s"
-            print "###_sensors_callback_###:latest_episode=",latest_episode
+            #print "###_sensors_callback_###:latest_episode=",latest_episode
             episode_set.append(list(latest_episode))
             particle = slide(particle)
             #episode_set,particle をファイルに書き込んで終了
@@ -406,19 +409,23 @@ def sensors_callback(message):
             f.close()
             sys.exit()
 
-        particle,alpha = sensor_update(particle) 
-        if alpha < alpha_threshold and T != 1:
-            p_alpha = alpha
-            p_particle = particle
-            retrospective_resetting()
-            particle,alpha = sensor_update(particle)
-            if p_alpha > alpha:
-                print "リセットしないほうがましだった"
-                particle = p_particle
-        motion_update(particle) #尤度に基づきパーティクルの分布を更新する
+        if T % 4 != 2:  #ここでズルしている
+            particle,alpha = sensor_update(particle) 
+            if alpha < alpha_threshold and T != 1:
+                p_alpha = alpha
+                p_particle = particle
+                retrospective_resetting()
+                particle,alpha = sensor_update(particle)
+                if p_alpha > alpha:
+                    #print "リセットしないほうがましだった"
+                    particle = p_particle
+            motion_update(particle) #尤度に基づきパーティクルの分布を更新する
+        else:
+            print "2*!"
+            
         action = decision_making(particle,latest_episode) #パーティクルの投票に基づき行動を決定する
         latest_episode[5] = action #最新のepisode_setにactionを追加
-        print "###_sensors_callback_###:latest_episode=",latest_episode
+        #print "###_sensors_callback_###:latest_episode=",latest_episode
         episode_set.append(list(latest_episode))#一連のエピソードをエピソード集合に追加
         if T > 1:
             particle = slide(particle)
